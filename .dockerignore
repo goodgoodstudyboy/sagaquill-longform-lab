@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+.git/
+.pytest_cache/
+.venv/
+venv/
+.env
+.env.*
+runs/
+tmp*/
+.sagaquill/
+.novel*/
+.claude/
+.playwright-mcp/
+material/

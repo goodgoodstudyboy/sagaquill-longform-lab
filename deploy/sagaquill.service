@@ -1,0 +1,15 @@
+[Unit]
+Description=SagaQuill web panel
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/sagaquill
+EnvironmentFile=/etc/sagaquill/sagaquill.env
+ExecStart=/bin/sh -c '/opt/sagaquill/.venv/bin/sagaquill serve --host "$SAGAQUILL_HOST" --port "$SAGAQUILL_PORT"'
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

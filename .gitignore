@@ -1,0 +1,22 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+.claude/
+.playwright-mcp/
+.codex/
+runs/
+tmp*/
+.sagaquill/
+.novel*/
+material/
+
+# Local generated spec drafts; keep committed smoke examples explicit.
+examples/specs/fanqie-*.json
+examples/specs/tomato-*.json
+examples/specs/v0.6-100k-acceptance*.json

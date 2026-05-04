@@ -1,0 +1,25 @@
+services:
+  sagaquill:
+    build: .
+    image: sagaquill:latest
+    ports:
+      - "${SAGAQUILL_PORT:-8765}:8765"
+    environment:
+      SAGAQUILL_ACCESS_TOKEN: "${SAGAQUILL_ACCESS_TOKEN:?Set SAGAQUILL_ACCESS_TOKEN before starting}"
+      SAGAQUILL_CONTINUATION_MODE: "${SAGAQUILL_CONTINUATION_MODE:-hybrid}"
+      SAGAQUILL_BASE_URL: "${SAGAQUILL_BASE_URL:-}"
+      SAGAQUILL_WIRE_API: "${SAGAQUILL_WIRE_API:-responses}"
+      SAGAQUILL_MODEL: "${SAGAQUILL_MODEL:-}"
+      SAGAQUILL_LIGHT_MODEL: "${SAGAQUILL_LIGHT_MODEL:-}"
+      SAGAQUILL_REVIEW_MODEL: "${SAGAQUILL_REVIEW_MODEL:-}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      OPENAI_BASE_URL: "${OPENAI_BASE_URL:-}"
+      OPENAI_MODEL: "${OPENAI_MODEL:-}"
+      ANTHROPIC_AUTH_TOKEN: "${ANTHROPIC_AUTH_TOKEN:-}"
+      ANTHROPIC_BASE_URL: "${ANTHROPIC_BASE_URL:-}"
+      ANTHROPIC_MODEL: "${ANTHROPIC_MODEL:-}"
+    volumes:
+      - ./runs:/app/runs
+      - ./.sagaquill:/app/.sagaquill
+      - ${HOME}/.codex:/root/.codex:ro
+    restart: unless-stopped
