@@ -177,6 +177,31 @@ cp .env.example .env
 docker compose up -d
 ```
 
+### 发版流程
+
+维护者可以用内置脚本发布新版本。脚本会更新 `pyproject.toml` 版本号、运行测试、提交版本变更、创建 Git tag、推送到 GitHub，并创建或更新 GitHub Release；tag 推送后会自动触发 Docker 镜像发布。
+
+```bash
+export GITHUB_TOKEN=<github-token>
+python scripts/release.py 0.7.2 --wait-docker
+```
+
+Windows PowerShell 也可以直接使用 token 文件：
+
+```powershell
+python scripts/release.py 0.7.2 --token-file C:\path\to\github-token.txt --wait-docker
+```
+
+常用选项：
+
+- `--dry-run`：只检查当前分支、工作区、版本号和远端仓库，不改文件、不提交、不推送
+- `--notes-file RELEASE_NOTES.md`：用指定 Markdown 文件作为 Release 说明
+- `--skip-checks`：跳过测试，只适合紧急补 tag，不建议常规使用
+- `--draft` / `--prerelease`：创建草稿版或预发布版 Release
+- `--skip-github-release`：只提交和打 tag，不创建 Release 页面
+
+发版前要求工作区干净，并且当前分支是 `main`。不要把 token 写进仓库；脚本只读取 `GITHUB_TOKEN`、`GH_TOKEN` 或显式传入的 `--token-file`。
+
 面板里的 `Provider 配置` 支持：
 
 - 修改当前项目的 `base URL / API key / flagship model / light model / wire_api / continuation_mode`
