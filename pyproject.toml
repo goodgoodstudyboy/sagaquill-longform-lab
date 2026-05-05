@@ -1,6 +1,6 @@
 [project]
 name = "sagaquill"
-version = "0.7.2"
+version = "0.7.3"
 description = "A self-reviewing multi-stage novel generation pipeline powered by Codex config and auth."
 readme = "README.md"
 requires-python = ">=3.11"
