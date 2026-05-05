@@ -49,6 +49,9 @@ from .normalize import best_text as _best_text
 from .normalize import character_seed_list as _character_seed_list
 from .normalize import string_list as _string_list
 from .projectio import (
+    default_pov_for_language,
+    is_chinese_output_language as _is_chinese_output_language,
+    localized_pov as _localized_project_pov,
     normalized_output_language as _normalized_output_language,
     normalized_progression_flavor as _normalized_progression_flavor,
     normalized_progression_mode as _normalized_progression_mode,
@@ -2940,6 +2943,7 @@ class NovelPipeline:
         output_language = _normalized_output_language(_best_text(payload.get("output_language"), project_input.output_language))
         defaults = _project_language_defaults(output_language, project_input.title)
 
+        pov = _localized_pov(project_input.pov, output_language)
         return ProjectSpec(
             title=_best_text(payload.get("title"), project_input.title),
             genre=_best_text(payload.get("genre"), project_input.genre, defaults["genre"]),
@@ -2953,7 +2957,7 @@ class NovelPipeline:
             outline_hint=_best_text(payload.get("outline_hint"), project_input.outline_hint, defaults["outline_hint"]),
             world_hint=_best_text(payload.get("world_hint"), project_input.world_hint, defaults["world_hint"]),
             ending_mode="series" if project_input.ending_mode == "series" else "standalone",
-            pov=project_input.pov or defaults["pov"],
+            pov=pov,
             target_total_chars=structure["target_total_chars"],
             target_chars_per_chapter=structure["target_chars_per_chapter"],
             chapter_count=structure["chapter_count"],
@@ -7641,69 +7645,41 @@ class NovelPipeline:
         )
 
     def _render_book_summary(self, package: BookPackage) -> str:
-        zh = _is_zh_output_language(package.output_language)
-        status = "通过" if package.final_passed else "未通过"
-        final_review = f"{status}（{package.final_score} 分）"
-        if not zh:
-            status = "Passed" if package.final_passed else "Not passed"
-            final_review = f"{status} ({package.final_score})"
-        lines = (
-            [
-                f"# {package.title} 简介包",
-                "",
-                "## 作品信息",
-                "",
-                f"- 题材：{package.genre}",
-                f"- 读者：{package.audience}",
-                f"- 风格：{package.tone}",
-                f"- 主角：{package.protagonist}",
-                f"- 字数：{package.total_chars}",
-                f"- 章节数：{package.chapter_count}",
-                f"- 卷数：{package.volume_count}",
-                f"- 终审：{final_review}",
-                "",
-                "## 实际剧情简介",
-                "",
-                package.factual_summary,
-                "",
-                "## 平台简介",
-                "",
-                package.marketing_blurb,
-                "",
-                "## 目录",
-                "",
-            ]
-            if zh
-            else [
-                f"# {package.title} Book Package",
-                "",
-                "## Book Info",
-                "",
-                f"- Genre: {package.genre}",
-                f"- Audience: {package.audience}",
-                f"- Tone: {package.tone}",
-                f"- Protagonist: {package.protagonist}",
-                f"- Total characters: {package.total_chars}",
-                f"- Chapters: {package.chapter_count}",
-                f"- Volumes: {package.volume_count}",
-                f"- Final review: {final_review}",
-                "",
-                "## Factual Summary",
-                "",
-                package.factual_summary,
-                "",
-                "## Marketing Blurb",
-                "",
-                package.marketing_blurb,
-                "",
-                "## Table Of Contents",
-                "",
-            ]
-        )
+        terms = _localized_terms(package.output_language)
+        status = terms["passed"] if package.final_passed else terms["not_passed"]
+        final_review = f"{status}{_localized_score(package.output_language, package.final_score)}"
+        lines = [
+            f"# {_localized_template(package.output_language, 'book_package').format(title=package.title)}",
+            "",
+            f"## {terms['book_info']}",
+            "",
+            f"- {terms['genre']}: {package.genre}",
+            f"- {terms['audience']}: {package.audience}",
+            f"- {terms['tone']}: {package.tone}",
+            f"- {terms['protagonist']}: {package.protagonist}",
+            f"- {terms['total_chars']}: {package.total_chars}",
+            f"- {terms['chapters']}: {package.chapter_count}",
+            f"- {terms['volumes']}: {package.volume_count}",
+            f"- {terms['final_review']}: {final_review}",
+            "",
+            f"## {terms['factual_summary']}",
+            "",
+            package.factual_summary,
+            "",
+            f"## {terms['marketing_blurb']}",
+            "",
+            package.marketing_blurb,
+            "",
+            f"## {terms['toc']}",
+            "",
+        ]
         for volume in package.catalog:
             chapter_range = volume.get("chapter_range")
             if isinstance(chapter_range, list) and len(chapter_range) == 2:
-                range_text = f"（第{chapter_range[0]}-{chapter_range[1]}章）" if zh else f" (Chapters {chapter_range[0]}-{chapter_range[1]})"
+                range_text = _localized_template(package.output_language, "chapter_range").format(
+                    start=chapter_range[0],
+                    end=chapter_range[1],
+                )
             else:
                 range_text = ""
             volume_index = volume.get("volume_index", "?")
@@ -11636,7 +11612,7 @@ def _project_spec_from_dict(payload: dict[str, Any]) -> ProjectSpec:
         outline_hint=_best_text(payload.get("outline_hint"), ""),
         world_hint=_best_text(payload.get("world_hint"), ""),
         ending_mode=_best_text(payload.get("ending_mode"), "standalone"),
-        pov=_best_text(payload.get("pov"), defaults["pov"]),
+        pov=_localized_pov(payload.get("pov"), output_language),
         target_total_chars=int(payload.get("target_total_chars", 0) or 0),
         target_chars_per_chapter=int(payload.get("target_chars_per_chapter", 0) or 0),
         chapter_count=chapter_count,
@@ -12190,8 +12166,7 @@ def _char_count(text: str) -> int:
 
 
 def _is_zh_output_language(language: object) -> bool:
-    value = _normalized_output_language(language)
-    return value in {"zh", "zh-Hans", "zh-CN", "zh-Hant", "zh-TW"} or value.startswith("zh-")
+    return _is_chinese_output_language(language)
 
 
 def _project_language_defaults(language: object, title: object) -> dict[str, str]:
@@ -12207,7 +12182,7 @@ def _project_language_defaults(language: object, title: object) -> dict[str, str
             "setting": "以现实感强的中文叙事空间为主要舞台。",
             "outline_hint": "前中后段都要持续升级，最终章必须闭环。",
             "world_hint": "世界规则必须服务剧情，不准设定炫技。",
-            "pov": "第三人称有限视角",
+            "pov": default_pov_for_language(language),
         }
     return {
         "genre": "high-concept commercial fiction",
@@ -12219,8 +12194,12 @@ def _project_language_defaults(language: object, title: object) -> dict[str, str
         "setting": "a vivid, grounded story world that serves the plot.",
         "outline_hint": "Escalate through the beginning, middle, and ending; close the main arc in the final chapter.",
         "world_hint": "World rules must serve story pressure rather than decorative exposition.",
-        "pov": "third person limited",
+        "pov": default_pov_for_language(language),
     }
+
+
+def _localized_pov(value: object, language: object) -> str:
+    return _localized_project_pov(value, language)
 
 
 def _chapter_heading(spec: ProjectSpec, index: object, title: object) -> str:
@@ -12228,17 +12207,233 @@ def _chapter_heading(spec: ProjectSpec, index: object, title: object) -> str:
 
 
 def _chapter_heading_from_parts(language: object, index: object, title: object) -> str:
-    title_text = _best_text(title, "")
-    if _is_zh_output_language(language):
-        return f"第{index}章 {title_text}".strip()
-    return f"Chapter {index}: {title_text}".strip()
+    return _localized_label(language, "chapter_heading", index=index, title=_best_text(title, ""))
 
 
 def _volume_heading_from_parts(language: object, index: object, title: object) -> str:
-    title_text = _best_text(title, "")
-    if _is_zh_output_language(language):
-        return f"第{index}卷 {title_text}".strip()
-    return f"Volume {index}: {title_text}".strip()
+    return _localized_label(language, "volume_heading", index=index, title=_best_text(title, ""))
+
+
+def _localized_label(language: object, key: str, *, index: object = "", title: str = "") -> str:
+    language_id = _normalized_output_language(language)
+    templates: dict[str, dict[str, str]] = {
+        "zh-Hans": {
+            "chapter_heading": "第{index}章 {title}",
+            "volume_heading": "第{index}卷 {title}",
+            "book_package": "{title} 简介包",
+            "book_info": "作品信息",
+            "genre": "题材",
+            "audience": "读者",
+            "tone": "风格",
+            "protagonist": "主角",
+            "total_chars": "字数",
+            "chapters": "章节数",
+            "volumes": "卷数",
+            "final_review": "终审",
+            "passed": "通过",
+            "not_passed": "未通过",
+            "score_suffix": "（{score} 分）",
+            "factual_summary": "实际剧情简介",
+            "marketing_blurb": "平台简介",
+            "toc": "目录",
+            "chapter_range": "（第{start}-{end}章）",
+        },
+        "en": {
+            "chapter_heading": "Chapter {index}: {title}",
+            "volume_heading": "Volume {index}: {title}",
+            "book_package": "{title} Book Package",
+            "book_info": "Book Info",
+            "genre": "Genre",
+            "audience": "Audience",
+            "tone": "Tone",
+            "protagonist": "Protagonist",
+            "total_chars": "Total characters",
+            "chapters": "Chapters",
+            "volumes": "Volumes",
+            "final_review": "Final review",
+            "passed": "Passed",
+            "not_passed": "Not passed",
+            "score_suffix": " ({score})",
+            "factual_summary": "Factual Summary",
+            "marketing_blurb": "Marketing Blurb",
+            "toc": "Table Of Contents",
+            "chapter_range": " (Chapters {start}-{end})",
+        },
+        "ja": {
+            "chapter_heading": "第{index}章 {title}",
+            "volume_heading": "第{index}巻 {title}",
+            "book_package": "{title} 作品資料",
+            "book_info": "作品情報",
+            "genre": "ジャンル",
+            "audience": "読者層",
+            "tone": "トーン",
+            "protagonist": "主人公",
+            "total_chars": "文字数",
+            "chapters": "章数",
+            "volumes": "巻数",
+            "final_review": "最終レビュー",
+            "passed": "合格",
+            "not_passed": "未合格",
+            "score_suffix": "（{score}点）",
+            "factual_summary": "あらすじ",
+            "marketing_blurb": "紹介文",
+            "toc": "目次",
+            "chapter_range": "（第{start}-{end}章）",
+        },
+        "ko": {
+            "chapter_heading": "{index}장 {title}",
+            "volume_heading": "{index}권 {title}",
+            "book_package": "{title} 작품 패키지",
+            "book_info": "작품 정보",
+            "genre": "장르",
+            "audience": "독자층",
+            "tone": "톤",
+            "protagonist": "주인공",
+            "total_chars": "글자 수",
+            "chapters": "화수",
+            "volumes": "권수",
+            "final_review": "최종 검토",
+            "passed": "통과",
+            "not_passed": "미통과",
+            "score_suffix": " ({score}점)",
+            "factual_summary": "줄거리 요약",
+            "marketing_blurb": "소개문",
+            "toc": "목차",
+            "chapter_range": " ({start}-{end}장)",
+        },
+        "es": {
+            "chapter_heading": "Capítulo {index}: {title}",
+            "volume_heading": "Volumen {index}: {title}",
+            "book_package": "Paquete de {title}",
+            "book_info": "Información de la obra",
+            "genre": "Género",
+            "audience": "Audiencia",
+            "tone": "Tono",
+            "protagonist": "Protagonista",
+            "total_chars": "Caracteres",
+            "chapters": "Capítulos",
+            "volumes": "Volúmenes",
+            "final_review": "Revisión final",
+            "passed": "Aprobada",
+            "not_passed": "No aprobada",
+            "score_suffix": " ({score})",
+            "factual_summary": "Resumen argumental",
+            "marketing_blurb": "Texto promocional",
+            "toc": "Índice",
+            "chapter_range": " (capítulos {start}-{end})",
+        },
+        "fr": {
+            "chapter_heading": "Chapitre {index} : {title}",
+            "volume_heading": "Volume {index} : {title}",
+            "book_package": "Dossier de {title}",
+            "book_info": "Informations",
+            "genre": "Genre",
+            "audience": "Public",
+            "tone": "Ton",
+            "protagonist": "Protagoniste",
+            "total_chars": "Caractères",
+            "chapters": "Chapitres",
+            "volumes": "Volumes",
+            "final_review": "Relecture finale",
+            "passed": "Validée",
+            "not_passed": "Non validée",
+            "score_suffix": " ({score})",
+            "factual_summary": "Résumé factuel",
+            "marketing_blurb": "Texte promotionnel",
+            "toc": "Table des matières",
+            "chapter_range": " (chapitres {start}-{end})",
+        },
+        "de": {
+            "chapter_heading": "Kapitel {index}: {title}",
+            "volume_heading": "Band {index}: {title}",
+            "book_package": "{title} Buchpaket",
+            "book_info": "Buchdaten",
+            "genre": "Genre",
+            "audience": "Zielgruppe",
+            "tone": "Ton",
+            "protagonist": "Protagonist",
+            "total_chars": "Zeichen",
+            "chapters": "Kapitel",
+            "volumes": "Bände",
+            "final_review": "Abschlussprüfung",
+            "passed": "Bestanden",
+            "not_passed": "Nicht bestanden",
+            "score_suffix": " ({score})",
+            "factual_summary": "Inhaltszusammenfassung",
+            "marketing_blurb": "Klappentext",
+            "toc": "Inhaltsverzeichnis",
+            "chapter_range": " (Kapitel {start}-{end})",
+        },
+    }
+    terms = templates.get(language_id, templates["en"])
+    return terms[key].format(index=index, title=title).strip()
+
+
+def _localized_template(language: object, key: str) -> str:
+    language_id = _normalized_output_language(language)
+    templates: dict[str, dict[str, str]] = {
+        "zh-Hans": {
+            "book_package": "{title} 简介包",
+            "score_suffix": "（{score} 分）",
+            "chapter_range": "（第{start}-{end}章）",
+        },
+        "en": {
+            "book_package": "{title} Book Package",
+            "score_suffix": " ({score})",
+            "chapter_range": " (Chapters {start}-{end})",
+        },
+        "ja": {
+            "book_package": "{title} 作品資料",
+            "score_suffix": "（{score}点）",
+            "chapter_range": "（第{start}-{end}章）",
+        },
+        "ko": {
+            "book_package": "{title} 작품 패키지",
+            "score_suffix": " ({score}점)",
+            "chapter_range": " ({start}-{end}장)",
+        },
+        "es": {
+            "book_package": "Paquete de {title}",
+            "score_suffix": " ({score})",
+            "chapter_range": " (capítulos {start}-{end})",
+        },
+        "fr": {
+            "book_package": "Dossier de {title}",
+            "score_suffix": " ({score})",
+            "chapter_range": " (chapitres {start}-{end})",
+        },
+        "de": {
+            "book_package": "{title} Buchpaket",
+            "score_suffix": " ({score})",
+            "chapter_range": " (Kapitel {start}-{end})",
+        },
+    }
+    return templates.get(language_id, templates["en"])[key]
+
+
+def _localized_terms(language: object) -> dict[str, str]:
+    language_id = _normalized_output_language(language)
+    keys = [
+        "book_info",
+        "genre",
+        "audience",
+        "tone",
+        "protagonist",
+        "total_chars",
+        "chapters",
+        "volumes",
+        "final_review",
+        "passed",
+        "not_passed",
+        "factual_summary",
+        "marketing_blurb",
+        "toc",
+    ]
+    return {key: _localized_label(language_id, key) for key in keys}
+
+
+def _localized_score(language: object, score: int) -> str:
+    return _localized_template(language, "score_suffix").format(score=score)
 
 
 def _is_short_standalone_spec(spec: ProjectSpec) -> bool:

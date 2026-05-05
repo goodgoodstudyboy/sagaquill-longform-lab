@@ -4207,6 +4207,19 @@ class PipelineTests(unittest.TestCase):
         self.assertIn("顶层必须是一个 JSON 对象", prompt)
         self.assertIn("场景字段名必须是 scenes", prompt)
 
+        spec.output_language = "en"
+        prompt = chapter_plan_user_prompt(
+            spec,
+            bible,
+            book_outline,
+            volume_outline,
+            chapter,
+            continuity,
+        )
+
+        self.assertIn("输出语言要求（English）", prompt)
+        self.assertIn("不要默认回到中文网文表达", prompt)
+
     def test_story_memory_retrieval_prefers_relevant_prior_chapter(self) -> None:
         client = StubClient([], [])
         temp_dir = Path.cwd() / "runs" / "test-artifacts" / f"memory-retrieval-{uuid.uuid4().hex}"

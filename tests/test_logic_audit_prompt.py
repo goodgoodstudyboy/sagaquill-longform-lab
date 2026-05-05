@@ -310,6 +310,54 @@ class LogicAuditPromptTests(unittest.TestCase):
         self.assertIn("番茄爆款", prompt)
         self.assertIn("追读", prompt)
 
+    def test_logic_audit_prompt_carries_non_chinese_language_guard(self) -> None:
+        spec = ProjectSpec(
+            title="English Test",
+            genre="urban fantasy",
+            audience="webnovel readers",
+            tone="fast and concrete",
+            premise="A courier delivers haunted final orders.",
+            theme="survival and choice",
+            hook="Every delivery changes the address.",
+            setting="a modern city",
+            protagonist="Mara",
+            outline_hint="escalate quickly",
+            world_hint="rules serve plot",
+            ending_mode="series",
+            pov="third person limited",
+            target_total_chars=2_000_000,
+            target_chars_per_chapter=2800,
+            chapter_count=720,
+            volume_count=60,
+            chapters_per_volume=12,
+            output_language="en",
+        )
+        prompt = logic_audit_user_prompt(
+            spec,
+            WorldBible(
+                title="English Test",
+                logline="hook",
+                setting_summary="setting",
+                core_conflict="conflict",
+                theme_statement="theme",
+                narrative_voice=["fast"],
+                world_rules=["rule"],
+                chapter_guardrails=["guardrail"],
+                ending_contract=["closure"],
+                major_threads=["thread"],
+                characters=[],
+            ),
+            BookOutline(title="English Test", one_line_summary="summary", act_structure=[], volumes=[]),
+            VolumeOutline(volume_index=1, title="Volume One", goal="goal", climax="climax", carry_over_threads=[], chapter_targets=[]),
+            [_build_chapter_result(1)],
+            ContinuityState(last_volume_index=1, last_chapter_index=1),
+            [],
+            [],
+        )
+
+        self.assertIn("输出语言要求（English）", prompt)
+        self.assertIn("不能中途切回中文", prompt)
+
     def test_stagnation_judge_prompt_includes_market_profile_guidance(self) -> None:
         spec = ProjectSpec(
             title="番茄测试",
@@ -383,6 +431,53 @@ class LogicAuditPromptTests(unittest.TestCase):
         self.assertIn("回报不足", prompt)
         self.assertIn("硬境界升级", prompt)
         self.assertIn("升级账本（聚焦摘要）", prompt)
+
+    def test_stagnation_judge_prompt_carries_non_chinese_language_guard(self) -> None:
+        spec = ProjectSpec(
+            title="English Test",
+            genre="urban fantasy",
+            audience="webnovel readers",
+            tone="fast and concrete",
+            premise="A courier delivers haunted final orders.",
+            theme="survival and choice",
+            hook="Every delivery changes the address.",
+            setting="a modern city",
+            protagonist="Mara",
+            outline_hint="escalate quickly",
+            world_hint="rules serve plot",
+            ending_mode="series",
+            pov="third person limited",
+            target_total_chars=2_000_000,
+            target_chars_per_chapter=2800,
+            chapter_count=720,
+            volume_count=60,
+            chapters_per_volume=12,
+            output_language="en",
+        )
+        prompt = stagnation_judge_user_prompt(
+            spec,
+            WorldBible(
+                title="English Test",
+                logline="hook",
+                setting_summary="setting",
+                core_conflict="conflict",
+                theme_statement="theme",
+                narrative_voice=["fast"],
+                world_rules=["rule"],
+                chapter_guardrails=["guardrail"],
+                ending_contract=["closure"],
+                major_threads=["thread"],
+                characters=[],
+            ),
+            VolumeOutline(volume_index=1, title="Volume One", goal="goal", climax="climax", carry_over_threads=[], chapter_targets=[]),
+            {"signal_level": "normal"},
+            [{"chapter_index": 1, "summary": "The courier survives."}],
+            {"last_chapter_index": 1},
+            {"chapter_index": 2, "goal": "keep moving"},
+        )
+
+        self.assertIn("输出语言要求（English）", prompt)
+        self.assertIn("不能中途切回中文", prompt)
 
 
 if __name__ == "__main__":

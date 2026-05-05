@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from .models import BookOutline, BookPackage, ChapterResult, FinalReview, ProjectSpec
-from .projectio import normalized_output_language
+from .projectio import is_chinese_output_language, normalized_output_language
 from .util import ensure_directory, slugify
 
 
@@ -275,8 +275,7 @@ def _relative_to(path: Path, root: Path) -> str:
 
 
 def _is_zh(spec: ProjectSpec) -> bool:
-    value = normalized_output_language(spec.output_language)
-    return value in {"zh", "zh-Hans", "zh-CN", "zh-Hant", "zh-TW"} or value.startswith("zh-")
+    return is_chinese_output_language(spec.output_language)
 
 
 def _epub_language(spec: ProjectSpec) -> str:
@@ -302,20 +301,16 @@ def _html_language(spec: ProjectSpec) -> str:
 
 def _chapter_heading(spec: ProjectSpec, index: object, title: object) -> str:
     title_text = str(title or "").strip()
-    if _is_zh(spec):
-        return f"第{index}章 {title_text}".strip()
-    return f"Chapter {index}: {title_text}".strip()
+    return _format_term(spec, "chapter_heading", index=index, title=title_text)
 
 
 def _volume_fallback_title(spec: ProjectSpec, index: object) -> str:
-    return f"第{index}卷" if _is_zh(spec) else f"Volume {index}"
+    return _format_term(spec, "volume_fallback", index=index)
 
 
 def _volume_heading(spec: ProjectSpec, index: object, title: object) -> str:
     title_text = str(title or "").strip()
-    if _is_zh(spec):
-        return f"第{index}卷 {title_text}".strip()
-    return f"Volume {index}: {title_text}".strip()
+    return _format_term(spec, "volume_heading", index=index, title=title_text)
 
 
 def _kv(label: str, value: object, spec: ProjectSpec) -> str:
@@ -327,8 +322,9 @@ def _file_item(path: str, description: str, spec: ProjectSpec) -> str:
 
 
 def _terms(spec: ProjectSpec) -> dict[str, str]:
-    if _is_zh(spec):
-        return {
+    language_id = normalized_output_language(spec.output_language)
+    tables: dict[str, dict[str, str]] = {
+        "zh-Hans": {
             "toc": "目录",
             "total_chars": "字数",
             "chapters": "章节",
@@ -350,27 +346,169 @@ def _terms(spec: ProjectSpec) -> dict[str, str]:
             "toc_file": "独立目录",
             "volumes_file": "分卷 Markdown",
             "epub_file": "EPUB 文件",
-        }
-    return {
-        "toc": "Table Of Contents",
-        "total_chars": "Total characters",
-        "chapters": "Chapters",
-        "volumes": "Volumes",
-        "submission_guide": "Submission Guide",
-        "basic_info": "Basic Info",
-        "genre": "Genre",
-        "audience": "Audience",
-        "output_language": "Output language",
-        "market_profile": "Market profile",
-        "progression_mode": "Progression mode",
-        "final_score": "Final review score",
-        "marketing_hook": "One-Line Hook",
-        "synopsis": "Synopsis",
-        "files": "Files",
-        "novel_md": "Full novel in Markdown",
-        "novel_txt": "Full novel in plain text",
-        "book_summary": "Book summary and table of contents",
-        "toc_file": "Standalone table of contents",
-        "volumes_file": "Volume Markdown files",
-        "epub_file": "EPUB files",
+            "chapter_heading": "第{index}章 {title}",
+            "volume_heading": "第{index}卷 {title}",
+            "volume_fallback": "第{index}卷",
+        },
+        "en": {
+            "toc": "Table Of Contents",
+            "total_chars": "Total characters",
+            "chapters": "Chapters",
+            "volumes": "Volumes",
+            "submission_guide": "Submission Guide",
+            "basic_info": "Basic Info",
+            "genre": "Genre",
+            "audience": "Audience",
+            "output_language": "Output language",
+            "market_profile": "Market profile",
+            "progression_mode": "Progression mode",
+            "final_score": "Final review score",
+            "marketing_hook": "One-Line Hook",
+            "synopsis": "Synopsis",
+            "files": "Files",
+            "novel_md": "Full novel in Markdown",
+            "novel_txt": "Full novel in plain text",
+            "book_summary": "Book summary and table of contents",
+            "toc_file": "Standalone table of contents",
+            "volumes_file": "Volume Markdown files",
+            "epub_file": "EPUB files",
+            "chapter_heading": "Chapter {index}: {title}",
+            "volume_heading": "Volume {index}: {title}",
+            "volume_fallback": "Volume {index}",
+        },
+        "ja": {
+            "toc": "目次",
+            "total_chars": "文字数",
+            "chapters": "章数",
+            "volumes": "巻数",
+            "submission_guide": "提出ガイド",
+            "basic_info": "基本情報",
+            "genre": "ジャンル",
+            "audience": "読者層",
+            "output_language": "出力言語",
+            "market_profile": "市場プロファイル",
+            "progression_mode": "成長モード",
+            "final_score": "最終評価点",
+            "marketing_hook": "一文フック",
+            "synopsis": "あらすじ",
+            "files": "ファイル一覧",
+            "novel_md": "全編 Markdown",
+            "novel_txt": "全編プレーンテキスト",
+            "book_summary": "作品資料と目次",
+            "toc_file": "独立目次",
+            "volumes_file": "巻別 Markdown",
+            "epub_file": "EPUB ファイル",
+            "chapter_heading": "第{index}章 {title}",
+            "volume_heading": "第{index}巻 {title}",
+            "volume_fallback": "第{index}巻",
+        },
+        "ko": {
+            "toc": "목차",
+            "total_chars": "글자 수",
+            "chapters": "화수",
+            "volumes": "권수",
+            "submission_guide": "제출 안내",
+            "basic_info": "기본 정보",
+            "genre": "장르",
+            "audience": "독자층",
+            "output_language": "출력 언어",
+            "market_profile": "시장 모드",
+            "progression_mode": "성장 모드",
+            "final_score": "최종 검토 점수",
+            "marketing_hook": "한 줄 훅",
+            "synopsis": "줄거리",
+            "files": "파일 목록",
+            "novel_md": "전체 소설 Markdown",
+            "novel_txt": "전체 소설 텍스트",
+            "book_summary": "작품 요약과 목차",
+            "toc_file": "독립 목차",
+            "volumes_file": "권별 Markdown",
+            "epub_file": "EPUB 파일",
+            "chapter_heading": "{index}장 {title}",
+            "volume_heading": "{index}권 {title}",
+            "volume_fallback": "{index}권",
+        },
+        "es": {
+            "toc": "Índice",
+            "total_chars": "Caracteres",
+            "chapters": "Capítulos",
+            "volumes": "Volúmenes",
+            "submission_guide": "Guía de entrega",
+            "basic_info": "Información básica",
+            "genre": "Género",
+            "audience": "Audiencia",
+            "output_language": "Idioma de salida",
+            "market_profile": "Perfil de mercado",
+            "progression_mode": "Modo de progresión",
+            "final_score": "Puntuación final",
+            "marketing_hook": "Gancho en una línea",
+            "synopsis": "Sinopsis",
+            "files": "Archivos",
+            "novel_md": "Novela completa en Markdown",
+            "novel_txt": "Novela completa en texto plano",
+            "book_summary": "Resumen y tabla de contenidos",
+            "toc_file": "Índice independiente",
+            "volumes_file": "Markdown por volumen",
+            "epub_file": "Archivos EPUB",
+            "chapter_heading": "Capítulo {index}: {title}",
+            "volume_heading": "Volumen {index}: {title}",
+            "volume_fallback": "Volumen {index}",
+        },
+        "fr": {
+            "toc": "Table des matières",
+            "total_chars": "Caractères",
+            "chapters": "Chapitres",
+            "volumes": "Volumes",
+            "submission_guide": "Guide de livraison",
+            "basic_info": "Informations de base",
+            "genre": "Genre",
+            "audience": "Public",
+            "output_language": "Langue de sortie",
+            "market_profile": "Profil de marché",
+            "progression_mode": "Mode de progression",
+            "final_score": "Score final",
+            "marketing_hook": "Accroche en une phrase",
+            "synopsis": "Synopsis",
+            "files": "Fichiers",
+            "novel_md": "Roman complet en Markdown",
+            "novel_txt": "Roman complet en texte brut",
+            "book_summary": "Résumé et table des matières",
+            "toc_file": "Table des matières autonome",
+            "volumes_file": "Markdown par volume",
+            "epub_file": "Fichiers EPUB",
+            "chapter_heading": "Chapitre {index} : {title}",
+            "volume_heading": "Volume {index} : {title}",
+            "volume_fallback": "Volume {index}",
+        },
+        "de": {
+            "toc": "Inhaltsverzeichnis",
+            "total_chars": "Zeichen",
+            "chapters": "Kapitel",
+            "volumes": "Bände",
+            "submission_guide": "Übergabeanleitung",
+            "basic_info": "Basisdaten",
+            "genre": "Genre",
+            "audience": "Zielgruppe",
+            "output_language": "Ausgabesprache",
+            "market_profile": "Marktprofil",
+            "progression_mode": "Progressionsmodus",
+            "final_score": "Abschlusswertung",
+            "marketing_hook": "Ein-Satz-Aufhänger",
+            "synopsis": "Zusammenfassung",
+            "files": "Dateien",
+            "novel_md": "Vollständiger Roman als Markdown",
+            "novel_txt": "Vollständiger Roman als Text",
+            "book_summary": "Zusammenfassung und Inhaltsverzeichnis",
+            "toc_file": "Eigenes Inhaltsverzeichnis",
+            "volumes_file": "Markdown-Dateien pro Band",
+            "epub_file": "EPUB-Dateien",
+            "chapter_heading": "Kapitel {index}: {title}",
+            "volume_heading": "Band {index}: {title}",
+            "volume_fallback": "Band {index}",
+        },
     }
+    return tables.get(language_id, tables["en"])
+
+
+def _format_term(spec: ProjectSpec, key: str, **values: object) -> str:
+    return _terms(spec)[key].format(**values).strip()

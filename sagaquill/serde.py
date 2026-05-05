@@ -33,23 +33,22 @@ from .models import (
     WorldBible,
 )
 from .normalize import best_text, character_seed_list, string_list
-from .projectio import normalized_output_language
+from .projectio import default_pov_for_language, is_chinese_output_language, localized_pov, normalized_output_language
 
 
 def _project_language_defaults(language: object) -> dict[str, str]:
-    value = normalized_output_language(language)
-    if value in {"zh", "zh-Hans", "zh-CN", "zh-Hant", "zh-TW"} or value.startswith("zh-"):
+    if is_chinese_output_language(language):
         return {
             "genre": "中文强剧情小说",
             "audience": "中文读者",
             "tone": "紧凑、具体、可读",
-            "pov": "第三人称有限视角",
+            "pov": default_pov_for_language(language),
         }
     return {
         "genre": "high-concept commercial fiction",
         "audience": "online fiction readers",
         "tone": "fast, concrete, readable",
-        "pov": "third person limited",
+        "pov": default_pov_for_language(language),
     }
 
 
@@ -147,7 +146,7 @@ def _project_spec_from_dict(payload: dict[str, Any]) -> ProjectSpec:
         outline_hint=best_text(payload.get("outline_hint"), ""),
         world_hint=best_text(payload.get("world_hint"), ""),
         ending_mode=best_text(payload.get("ending_mode"), "standalone"),
-        pov=best_text(payload.get("pov"), defaults["pov"]),
+        pov=localized_pov(payload.get("pov"), output_language),
         target_total_chars=int(payload.get("target_total_chars", 0) or 0),
         target_chars_per_chapter=int(payload.get("target_chars_per_chapter", 0) or 0),
         chapter_count=chapter_count,

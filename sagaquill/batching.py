@@ -9,6 +9,7 @@ from typing import Any
 
 from .models import BatchConfig, BatchItemState, BatchRecord, CharacterSeed, ProjectInput, ProposalRecord
 from .normalize import optional_text
+from .projectio import localized_pov
 
 
 _CSV_FIELD_MAP = {
@@ -151,7 +152,6 @@ def proposal_to_project_input(proposal: ProposalRecord, config: BatchConfig) -> 
     ending_mode = config.ending_mode or ("series" if config.run_to_completion is False else "standalone")
     return ProjectInput(
         title=proposal.title,
-        output_language=config.output_language,
         genre=optional_text(proposal.track),
         audience=optional_text(proposal.platform_fit),
         tone=optional_text(proposal.style_seed),
@@ -163,7 +163,7 @@ def proposal_to_project_input(proposal: ProposalRecord, config: BatchConfig) -> 
         outline_hint=optional_text(outline_hint),
         world_hint=optional_text(world_hint),
         ending_mode=ending_mode,
-        pov=config.pov or "第三人称有限视角",
+        pov=localized_pov(config.pov, config.output_language),
         target_total_chars=config.target_total_chars,
         target_chars_per_chapter=config.target_chars_per_chapter,
         chapter_count=config.chapter_count,
@@ -179,6 +179,7 @@ def proposal_to_project_input(proposal: ProposalRecord, config: BatchConfig) -> 
         must_include=must_include,
         avoid=avoid,
         character_seeds=character_seeds,
+        output_language=config.output_language,
     )
 
 

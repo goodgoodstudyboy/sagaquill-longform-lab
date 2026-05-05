@@ -173,6 +173,21 @@ class BatchingTests(unittest.TestCase):
         )
 
         self.assertEqual(project_input.output_language, "en")
+        self.assertEqual(project_input.pov, "third person limited")
+
+    def test_proposal_to_project_input_keeps_chinese_pov_for_chinese_alias(self) -> None:
+        csv_text = (
+            "编号,书名,赛道,平台适配,一句话钩子,故事核心\n"
+            "1,中文书,都市悬疑,中文读者,主角一路追查旧案,旧案重新浮出水面\n"
+        )
+        _, proposals, _ = create_batch_from_csv(csv_text, source_name="ideas.csv")
+        project_input = proposal_to_project_input(
+            proposals[0],
+            BatchConfig(output_language="zh-CN", target_total_chars=800_000),
+        )
+
+        self.assertEqual(project_input.output_language, "zh-CN")
+        self.assertEqual(project_input.pov, "第三人称有限视角")
 
 
 class BatchRuntimeTests(unittest.TestCase):

@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from sagaquill.projectio import normalized_output_language, panel_template_payload, project_input_from_dict, resolved_market_profile
+from sagaquill.models import BatchConfig, ProjectInput
 
 
 class ProjectIOTests(unittest.TestCase):
@@ -71,7 +72,31 @@ class ProjectIOTests(unittest.TestCase):
         )
 
         self.assertEqual(project_input.output_language, "en")
+        self.assertEqual(project_input.pov, "third person limited")
         self.assertEqual(normalized_output_language("日本語"), "ja")
+        self.assertEqual(normalized_output_language("zh_Hant"), "zh-Hant")
+        self.assertEqual(normalized_output_language("繁体中文"), "zh-Hant")
+
+    def test_project_input_from_dict_localizes_default_chinese_pov_for_non_chinese(self) -> None:
+        project_input = project_input_from_dict(
+            {
+                "title": "Night Courier",
+                "output_language": "en",
+                "pov": "第三人称有限视角",
+            }
+        )
+
+        self.assertEqual(project_input.pov, "third person limited")
+
+    def test_language_fields_do_not_break_legacy_positional_dataclasses(self) -> None:
+        project_input = ProjectInput("旧接口书名", "都市悬疑")
+        batch_config = BatchConfig(800000, 2500)
+
+        self.assertEqual(project_input.genre, "都市悬疑")
+        self.assertEqual(project_input.output_language, "zh-Hans")
+        self.assertEqual(batch_config.target_total_chars, 800000)
+        self.assertEqual(batch_config.target_chars_per_chapter, 2500)
+        self.assertEqual(batch_config.output_language, "zh-Hans")
 
     def test_panel_template_payload_exposes_progression_options(self) -> None:
         payload = panel_template_payload()

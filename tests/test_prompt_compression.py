@@ -178,6 +178,20 @@ class PromptCompressionTests(unittest.TestCase):
         self.assertIn("sampled_passages", prompt)
         self.assertLess(len(prompt), len(draft))
 
+    def test_continuity_prompt_carries_non_chinese_language_guard(self) -> None:
+        spec = _spec()
+        spec.output_language = "en"
+        prompt = continuity_user_prompt(
+            spec,
+            _bible(),
+            _chapter(),
+            _long_draft(),
+            _continuity_state(),
+        )
+
+        self.assertIn("输出语言要求（English）", prompt)
+        self.assertIn("不能中途切回中文", prompt)
+
     def test_long_memory_prompt_uses_excerpt_and_trims_related_state(self) -> None:
         draft = _long_draft()
         promises = [
@@ -225,6 +239,22 @@ class PromptCompressionTests(unittest.TestCase):
         self.assertLessEqual(prompt.count('"promise_id"'), 11)
         self.assertLessEqual(prompt.count('"effect_label"'), 9)
         self.assertLess(len(prompt), len(draft) + 5000)
+
+    def test_long_memory_prompt_carries_non_chinese_language_guard(self) -> None:
+        spec = _spec()
+        spec.output_language = "en"
+        prompt = long_memory_user_prompt(
+            spec,
+            _bible(),
+            _chapter(),
+            _plan(),
+            _long_draft(),
+            [],
+            [],
+        )
+
+        self.assertIn("输出语言要求（English）", prompt)
+        self.assertIn("不能中途切回中文", prompt)
 
 
 if __name__ == "__main__":

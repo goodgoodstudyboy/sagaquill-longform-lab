@@ -106,6 +106,88 @@ class DeliveryI18nTests(TestCase):
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)
 
+    def test_common_non_english_languages_use_localized_delivery_shell(self) -> None:
+        cases = [
+            ("ja", "第1章", "第1巻", "目次", "提出ガイド"),
+            ("ko", "1장", "1권", "목차", "제출 안내"),
+            ("es", "Capítulo 1", "Volumen 1", "Índice", "Guía de entrega"),
+            ("fr", "Chapitre 1", "Volume 1", "Table des matières", "Guide de livraison"),
+            ("de", "Kapitel 1", "Band 1", "Inhaltsverzeichnis", "Übergabeanleitung"),
+        ]
+        for language, chapter_label, volume_label, toc_label, guide_label in cases:
+            with self.subTest(language=language):
+                spec = _english_spec()
+                spec.output_language = language
+                package = BookPackage(
+                    title=spec.title,
+                    genre=spec.genre,
+                    audience=spec.audience,
+                    tone=spec.tone,
+                    protagonist=spec.protagonist,
+                    total_chars=200,
+                    chapter_count=1,
+                    volume_count=1,
+                    final_score=91,
+                    final_passed=True,
+                    factual_summary="Localized summary.",
+                    marketing_blurb="Localized blurb.",
+                    catalog=[
+                        {
+                            "volume_index": 1,
+                            "title": "Night Route",
+                            "chapter_range": [1, 1],
+                            "chapters": [{"index": 1, "title": "The Last Order"}],
+                        }
+                    ],
+                    output_language=language,
+                )
+                chapter = _chapter_result()
+                book_outline = BookOutline(
+                    title=spec.title,
+                    one_line_summary="A courier takes supernatural final deliveries.",
+                    act_structure=["Launch the route"],
+                    volumes=[
+                        VolumeBlueprint(
+                            index=1,
+                            start_chapter=1,
+                            end_chapter=1,
+                            title="Night Route",
+                            role="opening",
+                            central_question="Who ordered the last delivery?",
+                            escalation="the address changes",
+                            emotional_shift="from survival to agency",
+                        )
+                    ],
+                )
+
+                plain = NovelPipeline.__new__(NovelPipeline)._assemble_plain_novel(spec, [chapter])
+                summary = NovelPipeline.__new__(NovelPipeline)._render_book_summary(package)
+                temp_dir = Path.cwd() / "runs" / "test-artifacts" / f"delivery-i18n-{language}-{uuid.uuid4().hex}"
+                temp_dir.mkdir(parents=True, exist_ok=True)
+                try:
+                    build_delivery_artifacts(
+                        temp_dir,
+                        spec=spec,
+                        book_outline=book_outline,
+                        chapters=[chapter],
+                        book_package=package,
+                        final_review=FinalReview(True, 91, ["complete"], [], [], "passed"),
+                        total_chars=200,
+                    )
+                    toc = (temp_dir / "delivery" / "table-of-contents.md").read_text(encoding="utf-8")
+                    guide = (temp_dir / "delivery" / "submission-guide.md").read_text(encoding="utf-8")
+                finally:
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+
+                self.assertIn(chapter_label, plain)
+                self.assertIn(chapter_label, summary)
+                self.assertIn(volume_label, toc)
+                self.assertIn(toc_label, toc)
+                self.assertIn(guide_label, guide)
+                if language != "en":
+                    self.assertNotIn("Chapter 1:", plain)
+                    self.assertNotIn("Table Of Contents", toc)
+
 
 def _english_spec() -> ProjectSpec:
     return ProjectSpec(

@@ -27,9 +27,15 @@ _OUTPUT_LANGUAGE_ALIASES = {
     "zh-cn": "zh-Hans",
     "zh_hans": "zh-Hans",
     "zh-hans": "zh-Hans",
+    "zh_tw": "zh-Hant",
+    "zh-tw": "zh-Hant",
+    "zh_hant": "zh-Hant",
+    "zh-hant": "zh-Hant",
     "chinese": "zh-Hans",
     "simplified_chinese": "zh-Hans",
+    "traditional_chinese": "zh-Hant",
     "简体中文": "zh-Hans",
+    "繁体中文": "zh-Hant",
     "中文": "zh-Hans",
     "en": "en",
     "en_us": "en",
@@ -72,6 +78,22 @@ def normalized_output_language(value: object) -> str:
     if not normalized:
         return "zh-Hans"
     return _OUTPUT_LANGUAGE_ALIASES.get(normalized, text_value.strip())
+
+
+def is_chinese_output_language(value: object) -> bool:
+    normalized = normalized_output_language(value)
+    return normalized in {"zh", "zh-Hans", "zh-CN", "zh-Hant", "zh-TW"} or normalized.startswith("zh-")
+
+
+def default_pov_for_language(value: object) -> str:
+    return "第三人称有限视角" if is_chinese_output_language(value) else "third person limited"
+
+
+def localized_pov(value: object, language: object) -> str:
+    pov = optional_text(value)
+    if pov and not (not is_chinese_output_language(language) and pov == "第三人称有限视角"):
+        return pov
+    return default_pov_for_language(language)
 
 
 def normalized_progression_mode(value: object) -> str:
@@ -133,9 +155,9 @@ def project_input_from_dict(payload: dict[str, Any]) -> ProjectInput:
     title = text(payload.get("title"))
     if not title:
         raise ValueError("Project input must include a title.")
+    output_language = normalized_output_language(payload.get("output_language") or payload.get("language"))
     return ProjectInput(
         title=title,
-        output_language=normalized_output_language(payload.get("output_language") or payload.get("language")),
         genre=optional_text(payload.get("genre")),
         audience=optional_text(payload.get("audience")),
         tone=optional_text(payload.get("tone")),
@@ -147,7 +169,7 @@ def project_input_from_dict(payload: dict[str, Any]) -> ProjectInput:
         outline_hint=optional_text(payload.get("outline_hint")),
         world_hint=optional_text(payload.get("world_hint")),
         ending_mode=optional_text(payload.get("ending_mode")) or "standalone",
-        pov=optional_text(payload.get("pov")) or "第三人称有限视角",
+        pov=localized_pov(payload.get("pov"), output_language),
         target_total_chars=int_or_none(payload.get("target_total_chars")),
         target_chars_per_chapter=int_or_none(payload.get("target_chars_per_chapter")),
         chapter_count=int_or_none(payload.get("chapter_count")),
@@ -164,6 +186,7 @@ def project_input_from_dict(payload: dict[str, Any]) -> ProjectInput:
         avoid=string_list(payload.get("avoid")),
         character_seeds=character_seed_list(payload.get("character_seeds"), allow_strings=True),
         seed=int_or_none(payload.get("seed")),
+        output_language=output_language,
     )
 
 

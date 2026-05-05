@@ -35,7 +35,6 @@ class CharacterSeed:
 @dataclass(slots=True)
 class ProjectInput:
     title: str
-    output_language: str = "zh-Hans"
     genre: str | None = None
     audience: str | None = None
     tone: str | None = None
@@ -64,6 +63,7 @@ class ProjectInput:
     avoid: list[str] = field(default_factory=list)
     character_seeds: list[CharacterSeed] = field(default_factory=list)
     seed: int | None = None
+    output_language: str = "zh-Hans"
 
 
 @dataclass(slots=True)
@@ -576,7 +576,6 @@ class GenerationSummary:
 
 @dataclass(slots=True)
 class BatchConfig:
-    output_language: str = "zh-Hans"
     target_total_chars: int | None = None
     target_chars_per_chapter: int | None = None
     chapter_count: int | None = None
@@ -592,6 +591,7 @@ class BatchConfig:
     pov: str = "第三人称有限视角"
     run_to_completion: bool = True
     pause_at_chars: int = 300000
+    output_language: str = "zh-Hans"
 
 
 @dataclass(slots=True)

@@ -35,6 +35,7 @@ from .codex import (
 from .models import BatchConfig, BatchItemState, BatchRecord, ProposalRecord
 from .pipeline import NovelPipeline, perform_delivery_cleanup, reconcile_committed_run_state
 from .projectio import (
+    localized_pov,
     normalized_market_profile,
     normalized_output_language,
     normalized_progression_flavor,
@@ -1930,8 +1931,9 @@ class SagaQuillApp:
             payload.get("market_profile") or base.market_profile,
             payload,
         )
+        output_language = normalized_output_language(payload.get("output_language") or base.output_language)
+        pov = localized_pov(payload.get("pov") or base.pov, output_language)
         return BatchConfig(
-            output_language=normalized_output_language(payload.get("output_language") or base.output_language),
             target_total_chars=int(payload["target_total_chars"]) if payload.get("target_total_chars") not in {None, ""} else base.target_total_chars,
             target_chars_per_chapter=int(payload["target_chars_per_chapter"]) if payload.get("target_chars_per_chapter") not in {None, ""} else base.target_chars_per_chapter,
             chapter_char_tolerance=normalized_tolerance,
@@ -1944,9 +1946,10 @@ class SagaQuillApp:
             progression_pacing=normalized_progression_pacing(payload.get("progression_pacing") or base.progression_pacing),
             power_system_hint=str(payload.get("power_system_hint") or base.power_system_hint or "").strip() or None,
             ending_mode=ending_mode,
-            pov=str(payload.get("pov") or base.pov or "第三人称有限视角"),
+            pov=pov,
             run_to_completion=run_to_completion,
             pause_at_chars=pause_at_chars,
+            output_language=output_language,
         )
 
     def _batch_runtime_config_from_payload(self, payload: dict[str, Any] | None, *, existing: BatchConfig) -> BatchConfig:
