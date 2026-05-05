@@ -54,7 +54,7 @@ runs/
 ### 本地安装
 
 ```bash
-git clone <your-repo-url> sagaquill
+git clone https://github.com/goodgoodstudyboy/sagaquill-longform-lab.git sagaquill
 cd sagaquill
 python -m venv .venv
 source .venv/bin/activate
@@ -104,12 +104,26 @@ python -m sagaquill serve --host 127.0.0.1 --port 8765
 适合把面板部署到 Linux 服务器并用 systemd 常驻运行：
 
 ```bash
-git clone <your-repo-url> sagaquill
+curl -fsSL https://raw.githubusercontent.com/goodgoodstudyboy/sagaquill-longform-lab/main/scripts/bootstrap-linux.sh | sudo bash
+```
+
+默认安装到 `/opt/sagaquill`，配置写到 `/etc/sagaquill/sagaquill.env`，服务名是 `sagaquill.service`。
+
+如果仓库仍是 private，或者服务器不能访问 `raw.githubusercontent.com`，用 clone 方式安装：
+
+```bash
+git clone https://github.com/goodgoodstudyboy/sagaquill-longform-lab.git sagaquill
 cd sagaquill
 sudo bash scripts/install-linux.sh
 ```
 
-默认安装到 `/opt/sagaquill`，配置写到 `/etc/sagaquill/sagaquill.env`，服务名是 `sagaquill.service`。
+一行安装支持这些环境变量覆盖：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/goodgoodstudyboy/sagaquill-longform-lab/main/scripts/bootstrap-linux.sh | sudo env SAGAQUILL_HOST=0.0.0.0 SAGAQUILL_ACCESS_TOKEN=change-me-long-random-token bash
+```
+
+可用环境变量包括 `SAGAQUILL_REPO_URL`、`SAGAQUILL_REF`、`APP_DIR`、`ENV_DIR`、`SERVICE_NAME`、`SAGAQUILL_HOST`、`SAGAQUILL_PORT`、`SAGAQUILL_ACCESS_TOKEN`、`SAGAQUILL_BASE_URL`、`SAGAQUILL_MODEL`、`OPENAI_API_KEY`、`ANTHROPIC_AUTH_TOKEN` 等。首次安装时这些值会写入 `/etc/sagaquill/sagaquill.env`。
 
 常用命令：
 
