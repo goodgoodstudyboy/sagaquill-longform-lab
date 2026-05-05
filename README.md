@@ -152,10 +152,61 @@ sudo systemctl restart sagaquill
 
 ### Docker 部署
 
+公开镜像发布后，可以不 clone 项目，直接运行：
+
+```bash
+docker run -d \
+  --name sagaquill \
+  --restart unless-stopped \
+  -p 8765:8765 \
+  -e SAGAQUILL_ACCESS_TOKEN=change-me-long-random-token \
+  -v sagaquill-runs:/app/runs \
+  -v sagaquill-state:/app/.sagaquill \
+  ghcr.io/goodgoodstudyboy/sagaquill-longform-lab:latest
+```
+
+如果要复用宿主机上的 Codex provider 配置，再挂载 `~/.codex`：
+
+```bash
+docker run -d \
+  --name sagaquill \
+  --restart unless-stopped \
+  -p 8765:8765 \
+  -e SAGAQUILL_ACCESS_TOKEN=change-me-long-random-token \
+  -v sagaquill-runs:/app/runs \
+  -v sagaquill-state:/app/.sagaquill \
+  -v "$HOME/.codex:/root/.codex:ro" \
+  ghcr.io/goodgoodstudyboy/sagaquill-longform-lab:latest
+```
+
+也可以直接通过环境变量传 provider：
+
+```bash
+docker run -d \
+  --name sagaquill \
+  --restart unless-stopped \
+  -p 8765:8765 \
+  -e SAGAQUILL_ACCESS_TOKEN=change-me-long-random-token \
+  -e SAGAQUILL_BASE_URL=https://your-provider.example \
+  -e SAGAQUILL_MODEL=your-model \
+  -e OPENAI_API_KEY=your-api-key \
+  -v sagaquill-runs:/app/runs \
+  -v sagaquill-state:/app/.sagaquill \
+  ghcr.io/goodgoodstudyboy/sagaquill-longform-lab:latest
+```
+
+如果仓库或镜像仍是 private，需要先登录 GitHub Container Registry：
+
+```bash
+echo <github-token> | docker login ghcr.io -u <github-username> --password-stdin
+```
+
+如果你已经 clone 了项目，也可以用 compose：
+
 ```bash
 cp .env.example .env
 # 编辑 .env，至少修改 SAGAQUILL_ACCESS_TOKEN
-docker compose up -d --build
+docker compose up -d
 ```
 
 容器会挂载：

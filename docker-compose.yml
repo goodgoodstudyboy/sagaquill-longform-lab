@@ -1,7 +1,9 @@
 services:
   sagaquill:
-    build: .
-    image: sagaquill:latest
+    image: ghcr.io/goodgoodstudyboy/sagaquill-longform-lab:latest
+    # For local development, replace image with:
+    # build: .
+    # image: sagaquill:local
     ports:
       - "${SAGAQUILL_PORT:-8765}:8765"
     environment:

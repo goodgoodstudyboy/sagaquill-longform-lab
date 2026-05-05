@@ -2972,12 +2972,15 @@ class _Handler(BaseHTTPRequestHandler):
             raise
 
     def do_GET(self) -> None:  # noqa: N802
-        if not self._is_authorized():
-            self._reject_unauthorized()
-            return
         parsed = urlparse(self.path)
         query = parse_qs(parsed.query)
         try:
+            if parsed.path == "/healthz":
+                self._send_json({"ok": True})
+                return
+            if not self._is_authorized():
+                self._reject_unauthorized()
+                return
             if parsed.path == "/":
                 self._send_text(panel_html(), content_type="text/html; charset=utf-8")
                 return

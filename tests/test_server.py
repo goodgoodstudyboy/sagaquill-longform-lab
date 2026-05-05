@@ -20,6 +20,9 @@ class ServerTests(unittest.TestCase):
         thread.start()
         try:
             base = f"http://127.0.0.1:{server.server_port}"
+            health = json.loads(urllib.request.urlopen(f"{base}/healthz", timeout=5).read().decode("utf-8"))
+            self.assertTrue(health["ok"])
+
             with self.assertRaises(urllib.error.HTTPError) as caught:
                 urllib.request.urlopen(f"{base}/api/info", timeout=5)
             self.assertEqual(caught.exception.code, 401)
