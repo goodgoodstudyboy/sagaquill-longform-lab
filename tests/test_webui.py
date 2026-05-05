@@ -38,6 +38,12 @@ class WebUITests(unittest.TestCase):
         self.assertIn("renderProgressionFlavorOptions(template.progression_flavor_options || []);", html)
         self.assertIn("renderProgressionPacingOptions(template.progression_pacing_options || []);", html)
 
+    def test_completed_job_exposes_quality_report_link(self) -> None:
+        html = panel_html()
+        self.assertIn('id="quality-report-link"', html)
+        self.assertIn('/quality-report', html)
+        self.assertIn('quality_status', html)
+
 
 if __name__ == "__main__":
     unittest.main()

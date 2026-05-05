@@ -14,9 +14,10 @@ It is not a “one API call writes a whole book” toy. It treats long fiction a
 - Soft progression and hard realm progression with tiers, resources, enemy bands, and breakthrough milestones.
 - Long-range consistency through style bible, character voice cards, promise ledger, causality graph, continuity state, and long memory.
 - Automatic recovery through model review, local quality gates, volume-level logic audits, window repair, structured-output repair, and upstream retries.
+- Explainable quality reports with red lines, failures, warnings, evidence, and repair actions for continuity, character consistency, timeline, repetition, length, terminology density, and progression risks.
 - Multi-model routing where the flagship model handles planning/prose/review and the light model handles normalization, continuity, memory, and packaging.
 - Local Web UI for provider config, book launch, batch import, task status, pause/resume, preview, and delivery export.
-- Delivery artifacts including `novel.md`, `novel.txt`, `book-summary.md`, volume Markdown, table of contents, submission guide, EPUB, and manifest.
+- Delivery artifacts including `novel.md`, `novel.txt`, `book-summary.md`, volume Markdown, table of contents, submission guide, quality report, EPUB, and manifest.
 - Multi-language output for Simplified Chinese, English, Japanese, Korean, Spanish, French, German, and custom language codes.
 
 ## Quick Start
@@ -72,6 +73,16 @@ Open:
 ```text
 http://127.0.0.1:8765
 ```
+
+## Quality Reports
+
+Completed books include explainable quality artifacts:
+
+- `data/quality-report.json`: machine-readable full report.
+- `delivery/quality-report.md`: human-readable report in the delivery package.
+- The Web UI completed-task panel shows quality status and score, with a direct report link.
+
+The report groups issues by `red`, `fail`, `warn`, and `info`, and includes evidence plus suggested repair actions. It covers cleanup hygiene, repetition/wateriness, length control, terminology density, continuity, character consistency, timeline, hard progression, and ending closure. See [docs/QUALITY.md](docs/QUALITY.md) for the current policy.
 
 ### Linux systemd Install
 

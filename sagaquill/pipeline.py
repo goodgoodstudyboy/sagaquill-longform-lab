@@ -107,6 +107,7 @@ from .prompts import (
     world_user_prompt,
 )
 from .quality import _canonical_propulsion_label, analyze_chapter, analyze_novel, dedupe_repeated_paragraphs
+from .quality_report import build_quality_report
 from .runtime_views import (
     chapter_room_runtime_view,
     continuity_runtime_view,
@@ -216,10 +217,12 @@ def perform_delivery_cleanup(output_dir: str | Path, *, mode: str = "automatic")
             "novel.txt",
             "book-summary.md",
             "delivery/",
-            "data/final-review.json",
-            "data/run-summary.json",
-            "data/book-package.json",
-            "data/delivery-manifest.json",
+        "data/final-review.json",
+        "data/quality-report.json",
+        "data/run-summary.json",
+        "data/book-package.json",
+        "data/delivery-manifest.json",
+        "delivery/quality-report.md",
         ],
     }
     store.write_json("data/delivery-cleanup.json", report)
@@ -1599,11 +1602,23 @@ class NovelPipeline:
         plain_novel_text = self._assemble_plain_novel(spec, chapters)
         total_chars = _char_count(novel_text)
         book_package = self._build_book_package(spec, bible, book_outline, chapters, continuity, final_review, total_chars)
+        quality_report = build_quality_report(
+            spec=spec,
+            chapters=chapters,
+            final_review=final_review,
+            continuity=continuity,
+            promise_ledger=self._promise_ledger,
+            causality_graph=self._causality_graph,
+            progression_ledger=self._progression_ledger,
+            logic_audits=[item for _, item in sorted(self._logic_audits.items())],
+            total_chars=total_chars,
+        )
         self.store.write_text("novel.md", novel_text)
         self.store.write_text("novel.txt", plain_novel_text)
         self.store.write_text("book-summary.md", self._render_book_summary(book_package))
         self.store.write_json("data/book-package.json", asdict(book_package))
         self.store.write_json("data/final-review.json", asdict(final_review))
+        self.store.write_json("data/quality-report.json", quality_report)
         delivery_manifest = build_delivery_artifacts(
             self.output_dir,
             spec=spec,
@@ -1612,6 +1627,7 @@ class NovelPipeline:
             book_package=book_package,
             final_review=final_review,
             total_chars=total_chars,
+            quality_report=quality_report,
         )
         self.store.write_json("data/delivery-manifest.json", delivery_manifest)
         cleanup_report = perform_delivery_cleanup(self.output_dir, mode="automatic")
@@ -1630,6 +1646,9 @@ class NovelPipeline:
                 "summary_path": "book-summary.md",
                 "plain_text_path": "novel.txt",
                 "delivery_manifest_path": "delivery/delivery-manifest.json",
+                "quality_report_path": "delivery/quality-report.md",
+                "quality_status": quality_report.get("status"),
+                "quality_score": quality_report.get("score"),
                 "epub_path": delivery_manifest.get("files", {}).get("epub", ""),
                 "volume_paths": delivery_manifest.get("files", {}).get("volumes", []),
             },

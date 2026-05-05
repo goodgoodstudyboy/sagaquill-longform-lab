@@ -946,6 +946,7 @@ def panel_html() -> str:
             <button id="toggle-hide-job" class="secondary" type="button" style="display:none;">隐藏</button>
             <button id="delete-job" class="danger" type="button" style="display:none;">删除项目</button>
             <a id="novel-link" class="link-btn" href="#" target="_blank" style="display:none;">打开生成文本</a>
+            <a id="quality-report-link" class="link-btn" href="#" target="_blank" style="display:none;">打开质检报告</a>
             <button id="open-folder" class="link-btn" type="button" style="display:none;">打开生成文件夹</button>
             <button id="delivery-cleanup" class="link-btn" type="button" style="display:none;">交付清理</button>
           </div>
@@ -1914,7 +1915,15 @@ def panel_html() -> str:
       const summary = document.querySelector("#job-summary");
       if (data.summary) {
         summary.style.display = "block";
-        summary.textContent = `${data.summary.final_summary}  分数 ${data.summary.final_score ?? "-"}`;
+        const qualityParts = [];
+        if (data.summary.quality_status) {
+          qualityParts.push(`质检 ${data.summary.quality_status}`);
+        }
+        if (data.summary.quality_score !== undefined && data.summary.quality_score !== null) {
+          qualityParts.push(`质检分 ${data.summary.quality_score}`);
+        }
+        const qualityText = qualityParts.length ? `  ${qualityParts.join(" · ")}` : "";
+        summary.textContent = `${data.summary.final_summary}  终审分 ${data.summary.final_score ?? "-"}${qualityText}`;
       } else if (data.error) {
         summary.style.display = "block";
         summary.textContent = data.message || data.error;
@@ -1942,13 +1951,17 @@ def panel_html() -> str:
         deleteButton.style.display = "inline-flex";
       }
       const link = document.querySelector("#novel-link");
+      const qualityLink = document.querySelector("#quality-report-link");
       const folderButton = document.querySelector("#open-folder");
       const cleanupButton = document.querySelector("#delivery-cleanup");
       if (data.status === "completed") {
         link.style.display = "inline-flex";
         link.href = `/api/jobs/${data.job_id}/novel`;
+        qualityLink.style.display = "inline-flex";
+        qualityLink.href = `/api/jobs/${data.job_id}/quality-report`;
       } else {
         link.style.display = "none";
+        qualityLink.style.display = "none";
       }
       folderButton.style.display = data.output_dir ? "inline-flex" : "none";
       cleanupButton.style.display = data.status === "completed" ? "inline-flex" : "none";

@@ -476,6 +476,17 @@ class SagaQuillApp:
             raise FileNotFoundError(str(novel_path))
         return novel_path.read_text(encoding="utf-8")
 
+    def quality_report_text(self, job_id: str) -> str:
+        with self.lock:
+            state = self.jobs.get(job_id)
+            if state is None:
+                raise KeyError(job_id)
+            output_dir = Path(state.output_dir)
+        report_path = output_dir / "delivery" / "quality-report.md"
+        if not report_path.exists():
+            raise FileNotFoundError(str(report_path))
+        return report_path.read_text(encoding="utf-8")
+
     def info(self) -> dict[str, Any]:
         payload = provider_doctor(self.codex_dir, project_root=self.root)
         payload["startup_recovery_running"] = self.startup_recovery_running
@@ -3022,6 +3033,10 @@ class _Handler(BaseHTTPRequestHandler):
             if parsed.path.startswith("/api/jobs/") and parsed.path.endswith("/novel"):
                 job_id = parsed.path.split("/")[3]
                 self._send_text(self.app.novel_text(job_id), content_type="text/plain; charset=utf-8")
+                return
+            if parsed.path.startswith("/api/jobs/") and parsed.path.endswith("/quality-report"):
+                job_id = parsed.path.split("/")[3]
+                self._send_text(self.app.quality_report_text(job_id), content_type="text/plain; charset=utf-8")
                 return
             if parsed.path.startswith("/api/jobs/"):
                 job_id = parsed.path.split("/")[3]

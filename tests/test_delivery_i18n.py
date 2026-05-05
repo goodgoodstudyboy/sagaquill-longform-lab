@@ -85,6 +85,17 @@ class DeliveryI18nTests(TestCase):
                 book_package=package,
                 final_review=FinalReview(True, 91, ["complete"], [], [], "passed"),
                 total_chars=200,
+                quality_report={
+                    "status": "pass",
+                    "score": 91,
+                    "policy_version": "test",
+                    "summary": "No blocking issues.",
+                    "project": {"title": spec.title},
+                    "scorecard": [],
+                    "checks": [],
+                    "rules": [],
+                    "auto_repair_log": [],
+                },
             )
             toc = (temp_dir / "delivery" / "table-of-contents.md").read_text(encoding="utf-8")
             guide = (temp_dir / "delivery" / "submission-guide.md").read_text(encoding="utf-8")
@@ -97,6 +108,9 @@ class DeliveryI18nTests(TestCase):
             self.assertIn("Chapter 1: The Last Order", toc)
             self.assertIn("Submission Guide", guide)
             self.assertIn("- Output language: en", guide)
+            self.assertIn("quality-report.md", guide)
+            self.assertEqual(manifest_payload["files"]["quality_report"], "quality-report.md")
+            self.assertTrue((temp_dir / "delivery" / "quality-report.md").exists())
             with zipfile.ZipFile(epub_path) as archive:
                 content_opf = archive.read("OEBPS/content.opf").decode("utf-8")
                 nav = archive.read("OEBPS/nav.xhtml").decode("utf-8")

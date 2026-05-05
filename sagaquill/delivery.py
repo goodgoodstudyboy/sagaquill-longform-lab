@@ -11,6 +11,7 @@ from typing import Any
 
 from .models import BookOutline, BookPackage, ChapterResult, FinalReview, ProjectSpec
 from .projectio import is_chinese_output_language, normalized_output_language
+from .quality_report import render_quality_report_markdown
 from .util import ensure_directory, slugify
 
 
@@ -23,6 +24,7 @@ def build_delivery_artifacts(
     book_package: BookPackage,
     final_review: FinalReview,
     total_chars: int,
+    quality_report: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     root = Path(output_dir)
     delivery_dir = ensure_directory(root / "delivery")
@@ -31,7 +33,17 @@ def build_delivery_artifacts(
     ordered = sorted(chapters, key=lambda item: item.index)
     volume_paths = _write_volume_markdown(volumes_dir, spec, book_outline, ordered)
     toc_path = _write_table_of_contents(delivery_dir, spec, book_outline, ordered, book_package)
-    guide_path = _write_submission_guide(delivery_dir, spec, book_outline, ordered, book_package, final_review, total_chars)
+    quality_report_path = _write_quality_report(delivery_dir, spec, quality_report) if quality_report else None
+    guide_path = _write_submission_guide(
+        delivery_dir,
+        spec,
+        book_outline,
+        ordered,
+        book_package,
+        final_review,
+        total_chars,
+        quality_report_path=quality_report_path,
+    )
     epub_path = _write_epub(delivery_dir, spec, book_outline, ordered, book_package)
 
     manifest = {
@@ -53,6 +65,8 @@ def build_delivery_artifacts(
             "volumes": [_relative_to(path, delivery_dir) for path in volume_paths],
         },
     }
+    if quality_report_path is not None:
+        manifest["files"]["quality_report"] = _relative_to(quality_report_path, delivery_dir)
     manifest_path = delivery_dir / "delivery-manifest.json"
     manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return manifest
@@ -118,6 +132,7 @@ def _write_submission_guide(
     book_package: BookPackage,
     final_review: FinalReview,
     total_chars: int,
+    quality_report_path: Path | None = None,
 ) -> Path:
     terms = _terms(spec)
     lines = [
@@ -152,8 +167,23 @@ def _write_submission_guide(
         _file_item("volumes/", terms["volumes_file"], spec),
         _file_item("epub/", terms["epub_file"], spec),
     ]
+    if quality_report_path is not None:
+        lines.append(_file_item(_relative_to(quality_report_path, delivery_dir), terms["quality_report_file"], spec))
     path = delivery_dir / "submission-guide.md"
     path.write_text("\n".join(lines).strip() + "\n", encoding="utf-8")
+    return path
+
+
+def _write_quality_report(
+    delivery_dir: Path,
+    spec: ProjectSpec,
+    quality_report: dict[str, Any],
+) -> Path:
+    path = delivery_dir / "quality-report.md"
+    path.write_text(
+        render_quality_report_markdown(quality_report, output_language=spec.output_language),
+        encoding="utf-8",
+    )
     return path
 
 
@@ -346,6 +376,7 @@ def _terms(spec: ProjectSpec) -> dict[str, str]:
             "toc_file": "独立目录",
             "volumes_file": "分卷 Markdown",
             "epub_file": "EPUB 文件",
+            "quality_report_file": "质量报告",
             "chapter_heading": "第{index}章 {title}",
             "volume_heading": "第{index}卷 {title}",
             "volume_fallback": "第{index}卷",
@@ -372,6 +403,7 @@ def _terms(spec: ProjectSpec) -> dict[str, str]:
             "toc_file": "Standalone table of contents",
             "volumes_file": "Volume Markdown files",
             "epub_file": "EPUB files",
+            "quality_report_file": "Quality report",
             "chapter_heading": "Chapter {index}: {title}",
             "volume_heading": "Volume {index}: {title}",
             "volume_fallback": "Volume {index}",
@@ -398,6 +430,7 @@ def _terms(spec: ProjectSpec) -> dict[str, str]:
             "toc_file": "独立目次",
             "volumes_file": "巻別 Markdown",
             "epub_file": "EPUB ファイル",
+            "quality_report_file": "品質レポート",
             "chapter_heading": "第{index}章 {title}",
             "volume_heading": "第{index}巻 {title}",
             "volume_fallback": "第{index}巻",
@@ -424,6 +457,7 @@ def _terms(spec: ProjectSpec) -> dict[str, str]:
             "toc_file": "독립 목차",
             "volumes_file": "권별 Markdown",
             "epub_file": "EPUB 파일",
+            "quality_report_file": "품질 보고서",
             "chapter_heading": "{index}장 {title}",
             "volume_heading": "{index}권 {title}",
             "volume_fallback": "{index}권",
@@ -450,6 +484,7 @@ def _terms(spec: ProjectSpec) -> dict[str, str]:
             "toc_file": "Índice independiente",
             "volumes_file": "Markdown por volumen",
             "epub_file": "Archivos EPUB",
+            "quality_report_file": "Informe de calidad",
             "chapter_heading": "Capítulo {index}: {title}",
             "volume_heading": "Volumen {index}: {title}",
             "volume_fallback": "Volumen {index}",
@@ -476,6 +511,7 @@ def _terms(spec: ProjectSpec) -> dict[str, str]:
             "toc_file": "Table des matières autonome",
             "volumes_file": "Markdown par volume",
             "epub_file": "Fichiers EPUB",
+            "quality_report_file": "Rapport qualité",
             "chapter_heading": "Chapitre {index} : {title}",
             "volume_heading": "Volume {index} : {title}",
             "volume_fallback": "Volume {index}",
@@ -502,6 +538,7 @@ def _terms(spec: ProjectSpec) -> dict[str, str]:
             "toc_file": "Eigenes Inhaltsverzeichnis",
             "volumes_file": "Markdown-Dateien pro Band",
             "epub_file": "EPUB-Dateien",
+            "quality_report_file": "Qualitätsbericht",
             "chapter_heading": "Kapitel {index}: {title}",
             "volume_heading": "Band {index}: {title}",
             "volume_fallback": "Band {index}",
