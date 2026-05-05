@@ -161,6 +161,19 @@ class BatchingTests(unittest.TestCase):
         self.assertEqual(project_input.progression_pacing, "slow")
         self.assertEqual(project_input.power_system_hint, "练气-筑基-结丹；每次突破都要丹药、洞府和寿元代价。")
 
+    def test_proposal_to_project_input_preserves_output_language(self) -> None:
+        csv_text = (
+            "编号,书名,赛道,平台适配,一句话钩子,故事核心\n"
+            "1,Night Courier,urban fantasy,webnovel,last delivery to a haunted address,a courier survives supernatural orders\n"
+        )
+        _, proposals, _ = create_batch_from_csv(csv_text, source_name="ideas.csv")
+        project_input = proposal_to_project_input(
+            proposals[0],
+            BatchConfig(output_language="en", target_total_chars=800_000),
+        )
+
+        self.assertEqual(project_input.output_language, "en")
+
 
 class BatchRuntimeTests(unittest.TestCase):
     def setUp(self) -> None:

@@ -17,6 +17,13 @@ class WebUITests(unittest.TestCase):
         self.assertIn('<select id="batch_market_profile"></select>', html)
         self.assertIn("renderMarketProfileOptions(template.market_profile_options || []);", html)
 
+    def test_output_language_selects_are_template_driven(self) -> None:
+        html = panel_html()
+        self.assertIn('<select id="output_language" name="output_language"></select>', html)
+        self.assertIn('<select id="batch_output_language"></select>', html)
+        self.assertIn("renderOutputLanguageOptions(template.output_language_options || []);", html)
+        self.assertIn('output_language: document.querySelector("#output_language").value || "zh-Hans"', html)
+
     def test_progression_controls_are_template_driven(self) -> None:
         html = panel_html()
         self.assertIn('<select id="progression_mode" name="progression_mode"></select>', html)

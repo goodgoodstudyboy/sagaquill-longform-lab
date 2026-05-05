@@ -33,6 +33,24 @@ from .models import (
     WorldBible,
 )
 from .normalize import best_text, character_seed_list, string_list
+from .projectio import normalized_output_language
+
+
+def _project_language_defaults(language: object) -> dict[str, str]:
+    value = normalized_output_language(language)
+    if value in {"zh", "zh-Hans", "zh-CN", "zh-Hant", "zh-TW"} or value.startswith("zh-"):
+        return {
+            "genre": "中文强剧情小说",
+            "audience": "中文读者",
+            "tone": "紧凑、具体、可读",
+            "pov": "第三人称有限视角",
+        }
+    return {
+        "genre": "high-concept commercial fiction",
+        "audience": "online fiction readers",
+        "tone": "fast, concrete, readable",
+        "pov": "third person limited",
+    }
 
 
 def _chapter_fix_list(value: Any) -> list[dict[str, Any]]:
@@ -108,6 +126,8 @@ def _project_spec_from_dict(payload: dict[str, Any]) -> ProjectSpec:
     chapter_count = int(payload.get("chapter_count", 1) or 1)
     volume_count = int(payload.get("volume_count", 1) or 1)
     chapters_per_volume = int(payload.get("chapters_per_volume", math.ceil(chapter_count / max(volume_count, 1))) or 1)
+    output_language = normalized_output_language(payload.get("output_language"))
+    defaults = _project_language_defaults(output_language)
     volume_chapter_targets = _normalized_volume_chapter_targets(
         payload.get("volume_chapter_targets"),
         chapter_count=chapter_count,
@@ -115,9 +135,10 @@ def _project_spec_from_dict(payload: dict[str, Any]) -> ProjectSpec:
     )
     return ProjectSpec(
         title=best_text(payload.get("title"), ""),
-        genre=best_text(payload.get("genre"), "中文强剧情小说"),
-        audience=best_text(payload.get("audience"), "中文读者"),
-        tone=best_text(payload.get("tone"), "紧凑、具体、可读"),
+        output_language=output_language,
+        genre=best_text(payload.get("genre"), defaults["genre"]),
+        audience=best_text(payload.get("audience"), defaults["audience"]),
+        tone=best_text(payload.get("tone"), defaults["tone"]),
         premise=best_text(payload.get("premise"), ""),
         theme=best_text(payload.get("theme"), ""),
         hook=best_text(payload.get("hook"), ""),
@@ -126,7 +147,7 @@ def _project_spec_from_dict(payload: dict[str, Any]) -> ProjectSpec:
         outline_hint=best_text(payload.get("outline_hint"), ""),
         world_hint=best_text(payload.get("world_hint"), ""),
         ending_mode=best_text(payload.get("ending_mode"), "standalone"),
-        pov=best_text(payload.get("pov"), "第三人称有限视角"),
+        pov=best_text(payload.get("pov"), defaults["pov"]),
         target_total_chars=int(payload.get("target_total_chars", 0) or 0),
         target_chars_per_chapter=int(payload.get("target_chars_per_chapter", 0) or 0),
         chapter_count=chapter_count,

@@ -151,6 +151,7 @@ def proposal_to_project_input(proposal: ProposalRecord, config: BatchConfig) -> 
     ending_mode = config.ending_mode or ("series" if config.run_to_completion is False else "standalone")
     return ProjectInput(
         title=proposal.title,
+        output_language=config.output_language,
         genre=optional_text(proposal.track),
         audience=optional_text(proposal.platform_fit),
         tone=optional_text(proposal.style_seed),

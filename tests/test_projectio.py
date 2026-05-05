@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from sagaquill.projectio import panel_template_payload, project_input_from_dict, resolved_market_profile
+from sagaquill.projectio import normalized_output_language, panel_template_payload, project_input_from_dict, resolved_market_profile
 
 
 class ProjectIOTests(unittest.TestCase):
@@ -61,13 +61,27 @@ class ProjectIOTests(unittest.TestCase):
         self.assertEqual(project_input.progression_pacing, "slow")
         self.assertEqual(project_input.power_system_hint, "练气、筑基、结丹；突破需要丹药、洞府和寿元代价。")
 
+    def test_project_input_from_dict_parses_output_language_alias(self) -> None:
+        project_input = project_input_from_dict(
+            {
+                "title": "Night Courier",
+                "language": "English",
+                "premise": "A courier delivers to haunted addresses.",
+            }
+        )
+
+        self.assertEqual(project_input.output_language, "en")
+        self.assertEqual(normalized_output_language("日本語"), "ja")
+
     def test_panel_template_payload_exposes_progression_options(self) -> None:
         payload = panel_template_payload()
 
         self.assertIn("progression_mode_options", payload)
+        self.assertIn("output_language_options", payload)
         self.assertIn("progression_flavor_options", payload)
         self.assertIn("progression_pacing_options", payload)
         self.assertTrue(any(option["id"] == "hard_realm_progression" for option in payload["progression_mode_options"]))
+        self.assertTrue(any(option["id"] == "en" for option in payload["output_language_options"]))
         self.assertTrue(any(option["id"] == "xianxia_steady" for option in payload["progression_flavor_options"]))
         self.assertTrue(any(option["id"] == "slow" for option in payload["progression_pacing_options"]))
 

@@ -49,6 +49,7 @@ from .normalize import best_text as _best_text
 from .normalize import character_seed_list as _character_seed_list
 from .normalize import string_list as _string_list
 from .projectio import (
+    normalized_output_language as _normalized_output_language,
     normalized_progression_flavor as _normalized_progression_flavor,
     normalized_progression_mode as _normalized_progression_mode,
     normalized_progression_pacing as _normalized_progression_pacing,
@@ -2936,21 +2937,23 @@ class NovelPipeline:
         )
         if not character_seeds:
             character_seeds = [CharacterSeed(name=_best_text(payload.get("protagonist"), project_input.title))]
+        output_language = _normalized_output_language(_best_text(payload.get("output_language"), project_input.output_language))
+        defaults = _project_language_defaults(output_language, project_input.title)
 
         return ProjectSpec(
             title=_best_text(payload.get("title"), project_input.title),
-            genre=_best_text(payload.get("genre"), project_input.genre, "中文强剧情小说"),
-            audience=_best_text(payload.get("audience"), project_input.audience, "中文读者"),
-            tone=_best_text(payload.get("tone"), project_input.tone, "紧凑、具体、可读"),
-            premise=_best_text(payload.get("premise"), project_input.premise, f"围绕《{project_input.title}》展开的完整故事。"),
-            theme=_best_text(payload.get("theme"), project_input.theme, "人在压力下如何做出真正的选择"),
-            hook=_best_text(payload.get("hook"), project_input.hook, f"《{project_input.title}》必须从开篇就给出明确问题。"),
-            setting=_best_text(payload.get("setting"), project_input.setting, "以现实感强的中文叙事空间为主要舞台。"),
+            genre=_best_text(payload.get("genre"), project_input.genre, defaults["genre"]),
+            audience=_best_text(payload.get("audience"), project_input.audience, defaults["audience"]),
+            tone=_best_text(payload.get("tone"), project_input.tone, defaults["tone"]),
+            premise=_best_text(payload.get("premise"), project_input.premise, defaults["premise"]),
+            theme=_best_text(payload.get("theme"), project_input.theme, defaults["theme"]),
+            hook=_best_text(payload.get("hook"), project_input.hook, defaults["hook"]),
+            setting=_best_text(payload.get("setting"), project_input.setting, defaults["setting"]),
             protagonist=_best_text(payload.get("protagonist"), project_input.protagonist, character_seeds[0].name),
-            outline_hint=_best_text(payload.get("outline_hint"), project_input.outline_hint, "前中后段都要持续升级，最终章必须闭环。"),
-            world_hint=_best_text(payload.get("world_hint"), project_input.world_hint, "世界规则必须服务剧情，不准设定炫技。"),
+            outline_hint=_best_text(payload.get("outline_hint"), project_input.outline_hint, defaults["outline_hint"]),
+            world_hint=_best_text(payload.get("world_hint"), project_input.world_hint, defaults["world_hint"]),
             ending_mode="series" if project_input.ending_mode == "series" else "standalone",
-            pov=project_input.pov or "第三人称有限视角",
+            pov=project_input.pov or defaults["pov"],
             target_total_chars=structure["target_total_chars"],
             target_chars_per_chapter=structure["target_chars_per_chapter"],
             chapter_count=structure["chapter_count"],
@@ -2969,6 +2972,7 @@ class NovelPipeline:
             avoid=avoid,
             character_seeds=character_seeds,
             seed=project_input.seed,
+            output_language=output_language,
         )
 
     def _build_world(self, spec: ProjectSpec) -> WorldBible:
@@ -7546,13 +7550,13 @@ class NovelPipeline:
     def _assemble_novel(self, spec: ProjectSpec, chapters: list[ChapterResult]) -> str:
         body = [f"# {spec.title}", ""]
         for chapter in chapters:
-            body.extend([f"## 第{chapter.index}章 {chapter.title}", "", chapter.draft.strip(), ""])
+            body.extend([f"## {_chapter_heading(spec, chapter.index, chapter.title)}", "", chapter.draft.strip(), ""])
         return "\n".join(body).strip() + "\n"
 
     def _assemble_plain_novel(self, spec: ProjectSpec, chapters: list[ChapterResult]) -> str:
         body = [spec.title, ""]
         for chapter in chapters:
-            body.extend([f"第{chapter.index}章 {chapter.title}", "", chapter.draft.strip(), ""])
+            body.extend([_chapter_heading(spec, chapter.index, chapter.title), "", chapter.draft.strip(), ""])
         return "\n".join(body).strip() + "\n"
 
     def _write_partial_novel(self, spec: ProjectSpec, chapters: Any) -> None:
@@ -7633,45 +7637,81 @@ class NovelPipeline:
             factual_summary=_normalize_package_text(payload.get("factual_summary"), fallback.factual_summary, max_chars=560, min_chars=180),
             marketing_blurb=_normalize_package_text(payload.get("marketing_blurb"), fallback.marketing_blurb, max_chars=200, min_chars=40),
             catalog=fallback.catalog,
+            output_language=spec.output_language,
         )
 
     def _render_book_summary(self, package: BookPackage) -> str:
-        lines = [
-            f"# {package.title} 简介包",
-            "",
-            "## 作品信息",
-            "",
-            f"- 题材：{package.genre}",
-            f"- 读者：{package.audience}",
-            f"- 风格：{package.tone}",
-            f"- 主角：{package.protagonist}",
-            f"- 字数：{package.total_chars}",
-            f"- 章节数：{package.chapter_count}",
-            f"- 卷数：{package.volume_count}",
-            f"- 终审：{'通过' if package.final_passed else '未通过'}（{package.final_score} 分）",
-            "",
-            "## 实际剧情简介",
-            "",
-            package.factual_summary,
-            "",
-            "## 平台简介",
-            "",
-            package.marketing_blurb,
-            "",
-            "## 目录",
-            "",
-        ]
+        zh = _is_zh_output_language(package.output_language)
+        status = "通过" if package.final_passed else "未通过"
+        final_review = f"{status}（{package.final_score} 分）"
+        if not zh:
+            status = "Passed" if package.final_passed else "Not passed"
+            final_review = f"{status} ({package.final_score})"
+        lines = (
+            [
+                f"# {package.title} 简介包",
+                "",
+                "## 作品信息",
+                "",
+                f"- 题材：{package.genre}",
+                f"- 读者：{package.audience}",
+                f"- 风格：{package.tone}",
+                f"- 主角：{package.protagonist}",
+                f"- 字数：{package.total_chars}",
+                f"- 章节数：{package.chapter_count}",
+                f"- 卷数：{package.volume_count}",
+                f"- 终审：{final_review}",
+                "",
+                "## 实际剧情简介",
+                "",
+                package.factual_summary,
+                "",
+                "## 平台简介",
+                "",
+                package.marketing_blurb,
+                "",
+                "## 目录",
+                "",
+            ]
+            if zh
+            else [
+                f"# {package.title} Book Package",
+                "",
+                "## Book Info",
+                "",
+                f"- Genre: {package.genre}",
+                f"- Audience: {package.audience}",
+                f"- Tone: {package.tone}",
+                f"- Protagonist: {package.protagonist}",
+                f"- Total characters: {package.total_chars}",
+                f"- Chapters: {package.chapter_count}",
+                f"- Volumes: {package.volume_count}",
+                f"- Final review: {final_review}",
+                "",
+                "## Factual Summary",
+                "",
+                package.factual_summary,
+                "",
+                "## Marketing Blurb",
+                "",
+                package.marketing_blurb,
+                "",
+                "## Table Of Contents",
+                "",
+            ]
+        )
         for volume in package.catalog:
             chapter_range = volume.get("chapter_range")
             if isinstance(chapter_range, list) and len(chapter_range) == 2:
-                range_text = f"（第{chapter_range[0]}-{chapter_range[1]}章）"
+                range_text = f"（第{chapter_range[0]}-{chapter_range[1]}章）" if zh else f" (Chapters {chapter_range[0]}-{chapter_range[1]})"
             else:
                 range_text = ""
-            lines.extend([f"### 第{volume.get('volume_index', '?')}卷 {volume.get('title', '')}{range_text}", ""])
+            volume_index = volume.get("volume_index", "?")
+            lines.extend([f"### {_volume_heading_from_parts(package.output_language, volume_index, volume.get('title', ''))}{range_text}", ""])
             for chapter in volume.get("chapters", []):
                 if not isinstance(chapter, dict):
                     continue
-                lines.append(f"- 第{chapter.get('index', '?')}章 {chapter.get('title', '')}")
+                lines.append(f"- {_chapter_heading_from_parts(package.output_language, chapter.get('index', '?'), chapter.get('title', ''))}")
             lines.append("")
         return "\n".join(lines).strip() + "\n"
 
@@ -9285,6 +9325,7 @@ def _structured_mapping_has_keys(payload: Any, *, wrapper_keys: list[str], expec
 def _intake_payload_shape(project_input: ProjectInput) -> dict[str, Any]:
     return {
         "title": project_input.title,
+        "output_language": project_input.output_language,
         "genre": "题材定位",
         "audience": "目标读者",
         "tone": "叙事气质",
@@ -9310,7 +9351,7 @@ def _normalize_intake_payload(payload: Any) -> dict[str, Any]:
     merged = _merge_mapping_blocks(
         payload,
         wrapper_keys=["project", "brief", "project_spec", "spec"],
-        scalar_keys=["title", "genre", "audience", "tone", "premise", "theme", "hook", "setting", "protagonist", "outline_hint", "world_hint", "progression_mode", "progression_flavor", "progression_pacing", "power_system_hint"],
+        scalar_keys=["title", "output_language", "genre", "audience", "tone", "premise", "theme", "hook", "setting", "protagonist", "outline_hint", "world_hint", "progression_mode", "progression_flavor", "progression_pacing", "power_system_hint"],
         list_keys=["style_examples", "must_include", "avoid"],
         object_list_keys=["character_seeds"],
     )
@@ -11440,6 +11481,7 @@ def _fallback_book_package(
     catalog: list[dict[str, Any]],
     volume_digests: list[dict[str, Any]],
 ) -> BookPackage:
+    zh = _is_zh_output_language(spec.output_language)
     factual_parts: list[str] = []
     opening = _best_text(bible.logline, spec.premise, spec.hook)
     if opening:
@@ -11447,18 +11489,30 @@ def _fallback_book_package(
     for digest in volume_digests[:6]:
         summary = _best_text(digest.get("summary"))
         if summary:
-            factual_parts.append(f"第{digest.get('volume_index', '?')}卷，{summary}")
+            if zh:
+                factual_parts.append(f"第{digest.get('volume_index', '?')}卷，{summary}")
+            else:
+                factual_parts.append(f"Volume {digest.get('volume_index', '?')}: {summary}")
     closing = _best_text(
         continuity.recent_summaries[-1] if continuity.recent_summaries else "",
         final_review.short_summary,
     )
     if closing:
-        factual_parts.append(f"最终，{_strip_terminal_punctuation(closing)}。")
+        if zh:
+            factual_parts.append(f"最终，{_strip_terminal_punctuation(closing)}。")
+        else:
+            factual_parts.append(f"Finally, {_strip_terminal_punctuation(closing)}.")
     factual_summary = _normalize_package_text("".join(factual_parts), "", max_chars=560, min_chars=220)
     if not factual_summary:
+        fallback_conflict = (
+            f"{spec.protagonist} is pulled into a conflict that must be resolved."
+            if not zh
+            else f"{spec.protagonist}卷入了一场必须收束的冲突。"
+        )
+        fallback_close = "The book completes its main arc." if not zh else "整部作品完成了主线收束。"
         factual_summary = _clip_text(
-            _ensure_sentence(spec.hook or spec.premise or f"{spec.protagonist}卷入了一场必须收束的冲突。")
-            + _ensure_sentence(final_review.short_summary or "整部作品完成了主线收束。"),
+            _ensure_sentence(spec.hook or spec.premise or fallback_conflict)
+            + _ensure_sentence(final_review.short_summary or fallback_close),
             560,
         )
 
@@ -11467,14 +11521,25 @@ def _fallback_book_package(
         for item in [
             spec.hook,
             bible.logline,
-            f"{spec.protagonist}必须直面{bible.core_conflict}" if spec.protagonist and bible.core_conflict else "",
+            (
+                f"{spec.protagonist}必须直面{bible.core_conflict}"
+                if zh and spec.protagonist and bible.core_conflict
+                else f"{spec.protagonist} must face {bible.core_conflict}"
+                if spec.protagonist and bible.core_conflict
+                else ""
+            ),
         ]
         if item
     )
     marketing_blurb = _normalize_package_text(marketing_seed, "", max_chars=200, min_chars=40)
     if not marketing_blurb:
+        fallback_hook = (
+            f"{spec.protagonist}被迫面对一场无法回避的局势。"
+            if zh
+            else f"{spec.protagonist} is forced into a situation they cannot avoid."
+        )
         marketing_blurb = _clip_text(
-            _ensure_sentence(spec.hook or f"{spec.protagonist}被迫面对一场无法回避的局势。"),
+            _ensure_sentence(spec.hook or fallback_hook),
             200,
         )
 
@@ -11492,6 +11557,7 @@ def _fallback_book_package(
         factual_summary=factual_summary,
         marketing_blurb=marketing_blurb,
         catalog=catalog,
+        output_language=spec.output_language,
     )
 
 
@@ -11550,6 +11616,8 @@ def _project_spec_from_dict(payload: dict[str, Any]) -> ProjectSpec:
     chapter_count = int(payload.get("chapter_count", 1) or 1)
     volume_count = int(payload.get("volume_count", 1) or 1)
     chapters_per_volume = int(payload.get("chapters_per_volume", math.ceil(chapter_count / max(volume_count, 1))) or 1)
+    output_language = _normalized_output_language(payload.get("output_language"))
+    defaults = _project_language_defaults(output_language, payload.get("title"))
     volume_chapter_targets = _normalized_volume_chapter_targets(
         payload.get("volume_chapter_targets"),
         chapter_count=chapter_count,
@@ -11557,9 +11625,9 @@ def _project_spec_from_dict(payload: dict[str, Any]) -> ProjectSpec:
     )
     return ProjectSpec(
         title=_best_text(payload.get("title"), ""),
-        genre=_best_text(payload.get("genre"), "中文强剧情小说"),
-        audience=_best_text(payload.get("audience"), "中文读者"),
-        tone=_best_text(payload.get("tone"), "紧凑、具体、可读"),
+        genre=_best_text(payload.get("genre"), defaults["genre"]),
+        audience=_best_text(payload.get("audience"), defaults["audience"]),
+        tone=_best_text(payload.get("tone"), defaults["tone"]),
         premise=_best_text(payload.get("premise"), ""),
         theme=_best_text(payload.get("theme"), ""),
         hook=_best_text(payload.get("hook"), ""),
@@ -11568,7 +11636,7 @@ def _project_spec_from_dict(payload: dict[str, Any]) -> ProjectSpec:
         outline_hint=_best_text(payload.get("outline_hint"), ""),
         world_hint=_best_text(payload.get("world_hint"), ""),
         ending_mode=_best_text(payload.get("ending_mode"), "standalone"),
-        pov=_best_text(payload.get("pov"), "第三人称有限视角"),
+        pov=_best_text(payload.get("pov"), defaults["pov"]),
         target_total_chars=int(payload.get("target_total_chars", 0) or 0),
         target_chars_per_chapter=int(payload.get("target_chars_per_chapter", 0) or 0),
         chapter_count=chapter_count,
@@ -11587,6 +11655,7 @@ def _project_spec_from_dict(payload: dict[str, Any]) -> ProjectSpec:
         avoid=_string_list(payload.get("avoid")),
         character_seeds=_character_seed_list(payload.get("character_seeds")),
         seed=int(payload["seed"]) if payload.get("seed") is not None else None,
+        output_language=output_language,
     )
 
 
@@ -11887,6 +11956,7 @@ def _character_state_from_dict(payload: dict[str, Any]) -> CharacterState:
 def _project_spec_to_input(spec: ProjectSpec) -> ProjectInput:
     return ProjectInput(
         title=spec.title,
+        output_language=spec.output_language,
         genre=spec.genre,
         audience=spec.audience,
         tone=spec.tone,
@@ -12117,6 +12187,58 @@ def _story_room_constraint_target(text: str, *, agent: str = "") -> str:
 
 def _char_count(text: str) -> int:
     return len(re.sub(r"\s+", "", text))
+
+
+def _is_zh_output_language(language: object) -> bool:
+    value = _normalized_output_language(language)
+    return value in {"zh", "zh-Hans", "zh-CN", "zh-Hant", "zh-TW"} or value.startswith("zh-")
+
+
+def _project_language_defaults(language: object, title: object) -> dict[str, str]:
+    title_text = _best_text(title, "Untitled")
+    if _is_zh_output_language(language):
+        return {
+            "genre": "中文强剧情小说",
+            "audience": "中文读者",
+            "tone": "紧凑、具体、可读",
+            "premise": f"围绕《{title_text}》展开的完整故事。",
+            "theme": "人在压力下如何做出真正的选择",
+            "hook": f"《{title_text}》必须从开篇就给出明确问题。",
+            "setting": "以现实感强的中文叙事空间为主要舞台。",
+            "outline_hint": "前中后段都要持续升级，最终章必须闭环。",
+            "world_hint": "世界规则必须服务剧情，不准设定炫技。",
+            "pov": "第三人称有限视角",
+        }
+    return {
+        "genre": "high-concept commercial fiction",
+        "audience": "online fiction readers",
+        "tone": "fast, concrete, readable",
+        "premise": f"A complete story built around {title_text}.",
+        "theme": "how people make real choices under pressure",
+        "hook": f"{title_text} must open with a clear problem.",
+        "setting": "a vivid, grounded story world that serves the plot.",
+        "outline_hint": "Escalate through the beginning, middle, and ending; close the main arc in the final chapter.",
+        "world_hint": "World rules must serve story pressure rather than decorative exposition.",
+        "pov": "third person limited",
+    }
+
+
+def _chapter_heading(spec: ProjectSpec, index: object, title: object) -> str:
+    return _chapter_heading_from_parts(spec.output_language, index, title)
+
+
+def _chapter_heading_from_parts(language: object, index: object, title: object) -> str:
+    title_text = _best_text(title, "")
+    if _is_zh_output_language(language):
+        return f"第{index}章 {title_text}".strip()
+    return f"Chapter {index}: {title_text}".strip()
+
+
+def _volume_heading_from_parts(language: object, index: object, title: object) -> str:
+    title_text = _best_text(title, "")
+    if _is_zh_output_language(language):
+        return f"第{index}卷 {title_text}".strip()
+    return f"Volume {index}: {title_text}".strip()
 
 
 def _is_short_standalone_spec(spec: ProjectSpec) -> bool:

@@ -36,6 +36,7 @@ from .models import BatchConfig, BatchItemState, BatchRecord, ProposalRecord
 from .pipeline import NovelPipeline, perform_delivery_cleanup, reconcile_committed_run_state
 from .projectio import (
     normalized_market_profile,
+    normalized_output_language,
     normalized_progression_flavor,
     normalized_progression_mode,
     normalized_progression_pacing,
@@ -1930,6 +1931,7 @@ class SagaQuillApp:
             payload,
         )
         return BatchConfig(
+            output_language=normalized_output_language(payload.get("output_language") or base.output_language),
             target_total_chars=int(payload["target_total_chars"]) if payload.get("target_total_chars") not in {None, ""} else base.target_total_chars,
             target_chars_per_chapter=int(payload["target_chars_per_chapter"]) if payload.get("target_chars_per_chapter") not in {None, ""} else base.target_chars_per_chapter,
             chapter_char_tolerance=normalized_tolerance,

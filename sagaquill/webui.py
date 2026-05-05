@@ -667,6 +667,10 @@ def panel_html() -> str:
             <input id="genre" name="genre" placeholder="都市奇谭 / 科幻 / 仙侠 / 悬疑">
           </div>
           <div class="field">
+            <label for="output_language">输出语言</label>
+            <select id="output_language" name="output_language"></select>
+          </div>
+          <div class="field">
             <label for="audience">受众</label>
             <input id="audience" name="audience" placeholder="喜欢强剧情推进的中文读者">
           </div>
@@ -853,6 +857,10 @@ def panel_html() -> str:
             <select id="batch_market_profile"></select>
           </div>
           <div class="field">
+            <label for="batch_output_language">输出语言</label>
+            <select id="batch_output_language"></select>
+          </div>
+          <div class="field">
             <label for="batch_progression_mode">升级模式</label>
             <select id="batch_progression_mode"></select>
           </div>
@@ -1022,6 +1030,7 @@ def panel_html() -> str:
       currentBatch: null,
       template: null,
       presets: { audience_presets: [], style_presets: [] },
+      outputLanguages: [],
       marketProfiles: [],
       provider: null,
     };
@@ -1083,6 +1092,7 @@ def panel_html() -> str:
     function collectPayload() {
       return {
         title: document.querySelector("#title").value.trim(),
+        output_language: document.querySelector("#output_language").value || "zh-Hans",
         genre: document.querySelector("#genre").value.trim() || null,
         audience: document.querySelector("#audience").value.trim() || null,
         tone: document.querySelector("#tone").value.trim() || null,
@@ -1124,7 +1134,7 @@ def panel_html() -> str:
           }
           continue;
         }
-        if (key === "market_profile" || key === "progression_mode" || key === "progression_flavor" || key === "progression_pacing") {
+        if (key === "output_language" || key === "market_profile" || key === "progression_mode" || key === "progression_flavor" || key === "progression_pacing") {
           node.dataset.currentValue = value ?? "";
         }
         node.value = value ?? "";
@@ -1160,6 +1170,26 @@ def panel_html() -> str:
           .map(item => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.label)}</option>`)
           .join("");
         node.value = state.marketProfiles.some(item => item.id === previous) ? previous : defaultId;
+        node.dataset.currentValue = node.value;
+      });
+    }
+
+    function renderOutputLanguageOptions(options = []) {
+      state.outputLanguages = Array.isArray(options) && options.length
+        ? options
+        : [
+            { id: "zh-Hans", label: "简体中文" },
+            { id: "en", label: "English" },
+          ];
+      const defaultId = state.outputLanguages.find(item => item.id === "zh-Hans")?.id || state.outputLanguages[0]?.id || "zh-Hans";
+      ["#output_language", "#batch_output_language"].forEach(selector => {
+        const node = document.querySelector(selector);
+        if (!node) return;
+        const previous = node.value || node.dataset.currentValue || defaultId;
+        node.innerHTML = state.outputLanguages
+          .map(item => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.label)}</option>`)
+          .join("");
+        node.value = state.outputLanguages.some(item => item.id === previous) ? previous : defaultId;
         node.dataset.currentValue = node.value;
       });
     }
@@ -1230,6 +1260,11 @@ def panel_html() -> str:
     function marketProfileLabel(profileId) {
       const current = state.marketProfiles.find(item => item.id === profileId);
       return current ? current.label : (profileId === "tomato_mass" ? "番茄爆款" : "起点长篇");
+    }
+
+    function outputLanguageLabel(languageId) {
+      const current = (state.outputLanguages || []).find(item => item.id === languageId);
+      return current ? current.label : (languageId || "简体中文");
     }
 
     function progressionModeLabel(modeId) {
@@ -1315,6 +1350,7 @@ def panel_html() -> str:
         chapter_count: numeric(document.querySelector("#batch_chapter_count").value),
         volume_count: numeric(document.querySelector("#batch_volume_count").value),
         structure_mode: document.querySelector("#batch_structure_mode").value || "story_driven",
+        output_language: document.querySelector("#batch_output_language").value || "zh-Hans",
         market_profile: document.querySelector("#batch_market_profile").value || "qidian_longform",
         progression_mode: document.querySelector("#batch_progression_mode").value || "soft_progression",
         progression_flavor: document.querySelector("#batch_progression_flavor").value || "",
@@ -1342,6 +1378,7 @@ def panel_html() -> str:
         "#batch_chapter_count",
         "#batch_volume_count",
         "#batch_structure_mode",
+        "#batch_output_language",
         "#batch_market_profile",
         "#batch_progression_mode",
         "#batch_progression_flavor",
@@ -1591,6 +1628,8 @@ def panel_html() -> str:
       document.querySelector("#batch_chapter_count").value = "";
       document.querySelector("#batch_volume_count").value = "";
       document.querySelector("#batch_structure_mode").value = "story_driven";
+      document.querySelector("#batch_output_language").value = "zh-Hans";
+      document.querySelector("#batch_output_language").dataset.currentValue = "zh-Hans";
       document.querySelector("#batch_market_profile").value = "qidian_longform";
       document.querySelector("#batch_market_profile").dataset.currentValue = "qidian_longform";
       document.querySelector("#batch_progression_mode").value = "soft_progression";
@@ -1643,10 +1682,11 @@ def panel_html() -> str:
         ? `达到 ${batch.config.pause_at_chars || 300000} 字自动暂停（不影响规划）`
         : "写完整本";
       const marketProfile = marketProfileLabel(batch.config && batch.config.market_profile);
+      const outputLanguage = outputLanguageLabel(batch.config && batch.config.output_language);
       const progressionMode = progressionModeLabel(batch.config && batch.config.progression_mode);
       const planningLocked = (batch.status || "draft") !== "draft";
       document.querySelector("#batch-summary").textContent =
-        `批次：${batch.name}\n状态：${batch.status} ${batch.paused ? "（已暂停调度）" : ""}\n来源：${batch.source_name || "-"}\n并发：${batch.max_concurrent}\n完成方式：${batchMode}\n平台模式：${marketProfile}\n升级模式：${progressionMode}\n规划参数：${planningLocked ? "已冻结（总字数/平台模式/升级模式/结构/结局/卷章/章节字数不可再改）" : "可编辑"}\nProvider：${provider.model || "-"} / ${provider.light_model || "-"} / ${provider.review_model || provider.light_model || "-"} / ${provider.continuation_mode || "-"}\n计数：总 ${counts.total || 0} · 选中 ${counts.selected || 0} · 队列 ${counts.queued || 0} · 运行 ${counts.running || 0} · 暂停 ${counts.paused || 0} · 完成 ${counts.completed || 0} · 失败 ${counts.failed || 0}`;
+        `批次：${batch.name}\n状态：${batch.status} ${batch.paused ? "（已暂停调度）" : ""}\n来源：${batch.source_name || "-"}\n并发：${batch.max_concurrent}\n完成方式：${batchMode}\n输出语言：${outputLanguage}\n平台模式：${marketProfile}\n升级模式：${progressionMode}\n规划参数：${planningLocked ? "已冻结（总字数/输出语言/平台模式/升级模式/结构/结局/卷章/章节字数不可再改）" : "可编辑"}\nProvider：${provider.model || "-"} / ${provider.light_model || "-"} / ${provider.review_model || provider.light_model || "-"} / ${provider.continuation_mode || "-"}\n计数：总 ${counts.total || 0} · 选中 ${counts.selected || 0} · 队列 ${counts.queued || 0} · 运行 ${counts.running || 0} · 暂停 ${counts.paused || 0} · 完成 ${counts.completed || 0} · 失败 ${counts.failed || 0}`;
       renderBatchProposals(batch);
       if (batch.config) {
         document.querySelector("#batch_name").value = batch.name || "";
@@ -1658,6 +1698,8 @@ def panel_html() -> str:
         document.querySelector("#batch_chapter_count").value = batch.config.chapter_count || "";
         document.querySelector("#batch_volume_count").value = batch.config.volume_count || "";
         document.querySelector("#batch_structure_mode").value = batch.config.structure_mode || "story_driven";
+        document.querySelector("#batch_output_language").value = batch.config.output_language || "zh-Hans";
+        document.querySelector("#batch_output_language").dataset.currentValue = batch.config.output_language || "zh-Hans";
         document.querySelector("#batch_market_profile").value = batch.config.market_profile || "qidian_longform";
         document.querySelector("#batch_market_profile").dataset.currentValue = batch.config.market_profile || "qidian_longform";
         document.querySelector("#batch_progression_mode").value = batch.config.progression_mode || "soft_progression";
@@ -1733,6 +1775,7 @@ def panel_html() -> str:
       const template = await api("/api/template");
       state.template = template;
       renderPresetOptions(template.preset_catalog || {});
+      renderOutputLanguageOptions(template.output_language_options || []);
       renderMarketProfileOptions(template.market_profile_options || []);
       renderProgressionModeOptions(template.progression_mode_options || []);
       renderProgressionFlavorOptions(template.progression_flavor_options || []);
@@ -2045,6 +2088,7 @@ def panel_html() -> str:
       document.querySelector("#project-form").reset();
       document.querySelector("#audience_preset").value = "";
       document.querySelector("#style_preset").value = "";
+      document.querySelector("#output_language").value = "zh-Hans";
       document.querySelector("#market_profile").value = "qidian_longform";
       document.querySelector("#progression_mode").value = "soft_progression";
       document.querySelector("#progression_flavor").value = "";

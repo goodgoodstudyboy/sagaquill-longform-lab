@@ -21,6 +21,40 @@ _TOMATO_MARKET_PROFILE_HINTS = (
     "番茄爆款",
 )
 
+_OUTPUT_LANGUAGE_ALIASES = {
+    "zh": "zh-Hans",
+    "zh_cn": "zh-Hans",
+    "zh-cn": "zh-Hans",
+    "zh_hans": "zh-Hans",
+    "zh-hans": "zh-Hans",
+    "chinese": "zh-Hans",
+    "simplified_chinese": "zh-Hans",
+    "简体中文": "zh-Hans",
+    "中文": "zh-Hans",
+    "en": "en",
+    "en_us": "en",
+    "en-us": "en",
+    "english": "en",
+    "英语": "en",
+    "ja": "ja",
+    "japanese": "ja",
+    "日语": "ja",
+    "日本語": "ja",
+    "ko": "ko",
+    "korean": "ko",
+    "韩语": "ko",
+    "한국어": "ko",
+    "es": "es",
+    "spanish": "es",
+    "西班牙语": "es",
+    "fr": "fr",
+    "french": "fr",
+    "法语": "fr",
+    "de": "de",
+    "german": "de",
+    "德语": "de",
+}
+
 
 def normalized_market_profile(value: object) -> str:
     text_value = optional_text(value)
@@ -30,6 +64,14 @@ def normalized_market_profile(value: object) -> str:
     if normalized in {"qidian_longform", "qidian", "起点长篇", "起点"}:
         return "qidian_longform"
     return "qidian_longform"
+
+
+def normalized_output_language(value: object) -> str:
+    text_value = optional_text(value)
+    normalized = text_value.strip().lower().replace(" ", "_") if text_value else ""
+    if not normalized:
+        return "zh-Hans"
+    return _OUTPUT_LANGUAGE_ALIASES.get(normalized, text_value.strip())
 
 
 def normalized_progression_mode(value: object) -> str:
@@ -93,6 +135,7 @@ def project_input_from_dict(payload: dict[str, Any]) -> ProjectInput:
         raise ValueError("Project input must include a title.")
     return ProjectInput(
         title=title,
+        output_language=normalized_output_language(payload.get("output_language") or payload.get("language")),
         genre=optional_text(payload.get("genre")),
         audience=optional_text(payload.get("audience")),
         tone=optional_text(payload.get("tone")),
@@ -127,6 +170,7 @@ def project_input_from_dict(payload: dict[str, Any]) -> ProjectInput:
 def starter_project_input() -> dict[str, object]:
     return {
         "title": "雾港回声",
+        "output_language": "zh-Hans",
         "genre": "都市奇谭",
         "audience": "喜欢悬疑与情感推进的中文读者",
         "tone": "克制、冷峻、带一点潮湿的温柔",
@@ -444,6 +488,43 @@ def panel_template_payload() -> dict[str, object]:
             "id": "tomato_mass",
             "label": "番茄爆款",
             "description": "更强调黄金三章、低门槛强钩子、回报密度、换气和追读表现。",
+        },
+    ]
+    payload["output_language_options"] = [
+        {
+            "id": "zh-Hans",
+            "label": "简体中文",
+            "description": "默认模式，适合中文网文、长篇连载和中文平台交付。",
+        },
+        {
+            "id": "en",
+            "label": "English",
+            "description": "Novel prose, chapter drafts, summaries, and delivery copy target English readers.",
+        },
+        {
+            "id": "ja",
+            "label": "日本語",
+            "description": "日本語の小説本文と紹介文を生成します。ライトノベル寄りの企画にも使えます。",
+        },
+        {
+            "id": "ko",
+            "label": "한국어",
+            "description": "한국어 웹소설 본문과 소개문을 생성합니다.",
+        },
+        {
+            "id": "es",
+            "label": "Español",
+            "description": "Genera prosa, capítulos y textos de entrega en español.",
+        },
+        {
+            "id": "fr",
+            "label": "Français",
+            "description": "Génère le roman, les résumés et les textes de livraison en français.",
+        },
+        {
+            "id": "de",
+            "label": "Deutsch",
+            "description": "Erzeugt Romantext, Zusammenfassungen und Lieferdokumente auf Deutsch.",
         },
     ]
     payload["progression_mode_options"] = [

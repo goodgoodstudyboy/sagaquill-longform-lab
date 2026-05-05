@@ -35,7 +35,7 @@ from .util import compact_json
 
 def intake_system_prompt() -> str:
     return (
-        "你是中文小说项目总策划。"
+        "你是类型小说项目总策划。"
         "你的任务是把用户稀疏、含糊甚至只有标题的输入，补全成一个可以直接进入长篇生产流程的项目 brief。"
         "必须优先保证故事可读性、商业可执行性和完整闭环。"
         "只返回 JSON。"
@@ -45,6 +45,7 @@ def intake_system_prompt() -> str:
 def intake_user_prompt(project_input: ProjectInput, structure: dict[str, int]) -> str:
     shape = {
         "title": project_input.title,
+        "output_language": project_input.output_language,
         "genre": "题材定位",
         "audience": "目标读者",
         "tone": "叙事气质",
@@ -76,8 +77,9 @@ def intake_user_prompt(project_input: ProjectInput, structure: dict[str, int]) -
         "请把用户输入补全成一个能直接用于生成完整小说的项目 brief。\n"
         "硬要求：\n"
         "1. 必须保留用户已明确给出的设定，不得随意改动。\n"
-        "2. 如果用户只给标题，请推导出一个最稳、最好读、适合完整成书的中文故事方案。\n"
+        "2. 如果用户只给标题，请推导出一个最稳、最好读、适合完整成书的目标语言故事方案。\n"
         "3. 这是单次任务启动的长篇工程，不是试玩短片。必须考虑后续持续推进和最终收束。\n"
+        f"{_language_guidance(project_input.output_language, stage='planning')}\n"
         f"{_market_profile_guidance(project_input.market_profile, stage='planning')}\n"
         f"{_progression_guidance(project_input.progression_mode, project_input.progression_flavor, project_input.progression_pacing, stage='planning')}\n"
         "4. 默认 ending_mode 是 standalone，必须倾向完整闭环，不允许把主线故意留成半截。\n"
@@ -91,7 +93,7 @@ def intake_user_prompt(project_input: ProjectInput, structure: dict[str, int]) -
 
 def world_system_prompt() -> str:
     return (
-        "你是资深中文长篇小说编辑。"
+        "你是资深长篇小说编辑。"
         "你负责把项目 brief 转成可持续写作的设定圣经。"
         "必须让人物、世界规则和最终收束要求都落到可执行层。"
         "只返回 JSON。"
@@ -100,7 +102,7 @@ def world_system_prompt() -> str:
 
 def story_room_system_prompt() -> str:
     return (
-        "你是中文长篇小说策划会议记录员。"
+        "你是长篇小说策划会议记录员。"
         "你要模拟多位资深 agent 对同一项目进行短会讨论，并整理成结构化纪要。"
         "讨论必须具体，不能空喊口号。"
         "只返回 JSON。"
@@ -145,6 +147,7 @@ def story_room_user_prompt(spec: ProjectSpec) -> str:
         "2. must_hold 必须具体，可被后续提示词直接引用。\n"
         "3. shared_contract 必须覆盖：主线闭环、人物弧线、连续性、文风边界。\n"
         "4. 不要互相重复，要像同一项目组内部真实分工。\n"
+        f"{_language_guidance(spec.output_language, stage='planning')}\n"
         f"{_market_profile_guidance(spec.market_profile, stage='planning')}\n"
         f"{_progression_guidance(spec.progression_mode, spec.progression_flavor, spec.progression_pacing, stage='planning')}\n"
         "5. 只返回 JSON。\n\n"
@@ -155,7 +158,7 @@ def story_room_user_prompt(spec: ProjectSpec) -> str:
 
 def style_system_prompt() -> str:
     return (
-        "你是中文小说风格总监。"
+        "你是小说风格总监。"
         "你负责把项目气质、平台目标和文风约束整理成可长期检索的风格圣经。"
         "不要空泛形容词，只返回 JSON。"
     )
@@ -203,6 +206,7 @@ def style_user_prompt(
         "4.1 如果给了已写章节样本，必须优先尊重这些样本里已经形成的实际语气、节奏和叙述密度，不能把旧文风改写成另一种书。\n"
         "4.2 如果给了文风基线锚点，只能在不破坏 audience_contract、tone_targets、taboo_phrases 核心边界的前提下做局部校准。\n"
         "4.3 如果近期样本和文风基线冲突，优先保持基线，只输出能够解释这种冲突的微调建议，不要推翻基线。\n"
+        f"{_language_guidance(spec.output_language, stage='planning')}\n"
         f"{_market_profile_guidance(spec.market_profile, stage='planning')}\n"
         "5. 只返回 JSON。\n\n"
         f"项目 brief：\n{compact_json(spec)}\n\n"
@@ -252,6 +256,7 @@ def voice_user_prompt(
         "3. 角色之间要有辨识度，不能同腔同调。\n"
         "3.1 必须明确区分人物的社会位置、幽默感、沉默方式和话锋转向，避免所有人都用一种冷硬高压口吻说话。\n"
         "3.1 如果给了已写章节中的人物样本，必须优先总结他们已经写出来的说话习惯、情绪表达方式和句式，不要重设人物。\n"
+        f"{_language_guidance(spec.output_language, stage='planning')}\n"
         f"{_market_profile_guidance(spec.market_profile, stage='planning')}\n"
         "4. 只返回 JSON。\n\n"
         f"项目 brief：\n{compact_json(spec)}\n\n"
@@ -299,6 +304,7 @@ def world_user_prompt(spec: ProjectSpec, story_room: dict | None = None) -> str:
         "3. ending_contract 必须明确告诉后续生成器：最终章要兑现什么，什么不能留成半截。\n"
         "4. major_threads 必须覆盖主线、情感线、权力/现实冲突线。\n"
         "4.1 必须尊重策划会纪要里的 shared_contract 和各 agent 提出的 must_hold。\n"
+        f"{_language_guidance(spec.output_language, stage='planning')}\n"
         f"{_market_profile_guidance(spec.market_profile, stage='planning')}\n"
         f"{_progression_guidance(spec.progression_mode, spec.progression_flavor, spec.progression_pacing, stage='planning')}\n"
         "5. 只返回 JSON。\n\n"
@@ -310,7 +316,7 @@ def world_user_prompt(spec: ProjectSpec, story_room: dict | None = None) -> str:
 
 def power_system_system_prompt() -> str:
     return (
-        "你是中文长篇升级体系总设计师。"
+        "你是长篇升级体系总设计师。"
         "你的任务是把项目题材、世界观和平台打法，整理成可长期执行的升级体系圣经。"
         "必须让台阶、代价、资源、强敌和回报都能被后续大纲直接使用。"
         "只返回 JSON。"
@@ -387,6 +393,7 @@ def power_system_user_prompt(
         "3. milestone_plan 必须体现阶段目标、关键资源、关键试炼和回报，不能只写“继续变强”。\n"
         "4. forbidden_shortcuts 必须明确指出哪些无代价突破、越级碾压、资源白送、强敌失真是不能出现的。\n"
         "5. 若 progression_mode 是 soft_progression，也要给出主副升级轴和阶段里程碑，但可以减少硬境界数量。\n"
+        f"{_language_guidance(spec.output_language, stage='planning')}\n"
         f"{_market_profile_guidance(spec.market_profile, stage='planning')}\n"
         f"{_progression_guidance(spec.progression_mode, spec.progression_flavor, spec.progression_pacing, stage='planning')}\n"
         "6. 只返回 JSON。\n\n"
@@ -425,6 +432,7 @@ def book_outline_user_prompt(
         "3. 最后一卷必须以完整收束主线为目标；如果 ending_mode 是 standalone，不允许把主要问题拖成下本再说。\n"
         "4. must_payoff 必须写具体，不要空泛。\n"
         "4.1 必须吸收策划会纪要里的 shared_contract、global_risks 和 plot_architect / character_director 的约束。\n"
+        f"{_language_guidance(spec.output_language, stage='planning')}\n"
         f"{_market_profile_guidance(spec.market_profile, stage='planning')}\n"
         f"{_progression_guidance(spec.progression_mode, spec.progression_flavor, spec.progression_pacing, stage='planning')}\n"
         "5. 只返回 JSON。\n\n"
@@ -510,6 +518,7 @@ def volume_outline_user_prompt(
         "2.1 chapter_targets 中每章的 target_chars / min / max / chapter_role / split_allowed / merge_allowed 都要被尊重，章节体量应服务故事，不要把所有章写成一样长。\n"
         "3. 非最终章的 closing_mode 如果是 chapter_hook 或 volume_hook，章末必须制造明确的未决动作或决定。\n"
         "4. 如果 closing_mode 是 book_closure，本章必须完成主线闭环和人物关键选择，不允许最后一段只拿“新案子/新来客/新秘密”当终句。\n"
+        f"{_language_guidance(spec.output_language, stage='planning')}\n"
         f"{_market_profile_guidance(spec.market_profile, stage='planning')}\n"
         f"{_progression_guidance(spec.progression_mode, spec.progression_flavor, spec.progression_pacing, stage='planning')}\n"
         "5. 只返回 JSON。\n\n"
@@ -602,6 +611,50 @@ def _normalized_market_profile(value: str | None) -> str:
 
 def _market_profile_label(value: str | None) -> str:
     return "番茄爆款" if _normalized_market_profile(value) == "tomato_mass" else "起点长篇"
+
+
+def _language_label(value: str | None) -> str:
+    normalized = _best_text(value, "zh-Hans").strip()
+    labels = {
+        "zh-Hans": "简体中文",
+        "zh": "简体中文",
+        "en": "English",
+        "ja": "日本語",
+        "ko": "한국어",
+        "es": "Español",
+        "fr": "Français",
+        "de": "Deutsch",
+    }
+    return labels.get(normalized, normalized or "简体中文")
+
+
+def _language_guidance(value: str | None, *, stage: str) -> str:
+    label = _language_label(value)
+    if label == "简体中文":
+        return (
+            "输出语言要求（简体中文）：\n"
+            "1. 小说正文、章节标题、简介和交付文案使用简体中文。\n"
+            "2. JSON 字段名保持系统要求不变，字段内容用简体中文表达。"
+        )
+    if stage == "prose":
+        return (
+            f"输出语言要求（{label}）：\n"
+            f"1. 小说正文、章节标题、人物对白、叙述、简介和交付文案必须使用 {label}。\n"
+            "2. 不要把中文提示词、中文字段说明或中文章节格式泄漏进正文；必要的文化设定要自然本地化表达。\n"
+            "3. JSON 字段名保持系统要求不变，但字段内容应使用目标语言。"
+        )
+    if stage == "review":
+        return (
+            f"输出语言要求（{label}）：\n"
+            f"1. 审校时必须检查正文是否稳定使用 {label}，不能中途切回中文或混入中文提示词。\n"
+            "2. JSON 字段名保持系统要求不变；issues、required_fixes、summary 等字段内容优先使用目标语言，必要时可用简短中文说明问题类型。"
+        )
+    return (
+        f"输出语言要求（{label}）：\n"
+        f"1. 所有会进入小说、章节标题、人物声线、简介和交付材料的内容必须面向 {label} 创作。\n"
+        "2. 系统内部 JSON 字段名保持不变，但字段内容应尽量使用目标语言；不要默认回到中文网文表达。\n"
+        "3. 如果保留中国网文平台模式，只迁移节奏、爽点和结构方法，不要强行保留中文术语腔。"
+    )
 
 
 def _market_profile_guidance(value: str | None, *, stage: str) -> str:
@@ -718,6 +771,8 @@ def _progression_guidance(mode: str | None, flavor: str | None, pacing: str | No
 def _project_runtime_payload(spec: ProjectSpec) -> dict:
     return {
         "title": spec.title,
+        "output_language": spec.output_language,
+        "output_language_label": _language_label(spec.output_language),
         "genre": spec.genre,
         "audience": spec.audience,
         "tone": spec.tone,
@@ -1379,7 +1434,7 @@ def chapter_room_user_prompt(
 
 def draft_system_prompt() -> str:
     return (
-        "你是成熟的中文小说作者。"
+        "你是成熟的类型小说作者。"
         "正文必须好读、具体、克制、有画面，不准解释自己在写什么。"
         "只输出小说正文，不要标题、提纲、分点、注释。"
     )
@@ -1429,7 +1484,7 @@ def draft_user_prompt(
     return (
         "请根据以下资料写出本章正文。\n"
         "硬要求：\n"
-        f"1. 使用简体中文，目标篇幅约 {target_chars} 字，允许区间是 {chapter_min_chars} 到 {chapter_max_chars} 字。\n"
+        f"1. 使用 {_language_label(spec.output_language)}，目标篇幅约 {target_chars} 字，允许区间是 {chapter_min_chars} 到 {chapter_max_chars} 字。\n"
         f"{length_rule}"
         "2. 按场景卡推进，不能漏掉关键转折。\n"
         "3. 人物行为必须符合设定与当前连续性状态。\n"
@@ -1443,6 +1498,7 @@ def draft_user_prompt(
         "4.6 若最近几章已连续高压，本章要保留换气和生活质感，不能从头到尾都用同一强度顶着走。\n"
         "4.7 如果章节执行包里的 recent_propulsion_history 显示最近几章仍在同一推进簇，本章可以继续围绕同一核心问题推进，但必须带来新的后果、代价、站位变化或不同 scene 功能，不能只是“拿新证物/再抬一级”式原地打转。\n"
         "4.8 若本章已进入全书最后两章，至少两位核心角色的对白和情绪反应要保留可辨识的个人声口，不能一起收成同一种硬句式。\n"
+        f"{_language_guidance(spec.output_language, stage='prose')}\n"
         f"{_market_profile_guidance(spec.market_profile, stage='prose')}\n"
         "5. 不得出现“作者按”“待续”“这里略去”等占位词。\n"
         "5.1 若原始章节目标与章节计划或当前连续性状态冲突，以章节计划和当前连续性状态为准。\n"
@@ -1456,7 +1512,7 @@ def draft_user_prompt(
 
 
 def chapter_review_system_prompt() -> str:
-    return "你是严苛的中文小说审校编辑。你必须挑出真实问题，只返回 JSON。"
+    return "你是严苛的小说审校编辑。你必须挑出真实问题，只返回 JSON。"
 
 
 def chapter_review_user_prompt(
@@ -1522,6 +1578,7 @@ def chapter_review_user_prompt(
         f"{length_rule}"
         "5.4 如果本章已经把必须留给后续章节的接口、决定和现实动作铺好，而问题主要属于后续卷仍需继续推进的长线风险，这类内容写进 issues 即可，不应单独据此判定本章不通过。\n"
         "5.5 若章节执行包里的 recent_propulsion_history 显示最近几章仍在同一推进簇，要检查是否出现功能重复、升级方式重复、只是把同一结论再抬半级的空转；若本章位于最后两章，还要检查多名核心角色是否被写成同一种收束语气。\n"
+        f"{_language_guidance(spec.output_language, stage='review')}\n"
         f"{_market_profile_guidance(spec.market_profile, stage='review')}\n"
         "6. 只返回 JSON。\n\n"
         f"项目 brief（运行态摘要）：\n{compact_json(_project_runtime_payload(spec))}\n\n"
@@ -1593,6 +1650,7 @@ def rewrite_user_prompt(
         f"{length_rule}"
         "2. 优先解决 required_fixes。\n"
         f"{polish_rules}"
+        f"{_language_guidance(spec.output_language, stage='prose')}\n"
         f"{_market_profile_guidance(spec.market_profile, stage='prose')}\n"
         "3. 保住原章节的核心剧情目的。\n"
         "3.0 文风、声线、承诺兑现、因果后果都必须和当前约束重新对齐。\n"
@@ -1663,6 +1721,7 @@ def compression_user_prompt(
         "2. 优先删除或合并这些内容：重复环境描写、同一信息的换说、流程术语的重复解释、主题总结句、已经由动作表达过的心理说明。\n"
         "3. 保留章节计划里的所有关键 scene、must_include、closing_mode 和核心因果，不准把关键转折压没。\n"
         "4. 如果需要收缩，请优先把长段解释改成更短的动作、对白或具体现实判断。\n"
+        f"{_language_guidance(spec.output_language, stage='prose')}\n"
         f"{_market_profile_guidance(spec.market_profile, stage='prose')}\n"
         "5. 若本章是短篇或 standalone，结尾必须保留闭环/钩子强度，但不能靠新增信息扩字。\n"
         "6. 只输出完整正文。\n\n"
@@ -2258,7 +2317,7 @@ def stagnation_judge_user_prompt(
 
 def book_package_system_prompt() -> str:
     return (
-        "你是中文小说发行编辑。"
+        "你是小说发行编辑。"
         "你要根据已经写完的实际成书内容，生成一个事实型剧情简介和一个平台首屏简介。"
         "不许胡编，不许拿立项文案冒充成书简介。"
         "只返回 JSON。"
@@ -2328,9 +2387,10 @@ def book_package_user_prompt(
         "请为这部已经完稿的小说生成两段简介。\n"
         "要求：\n"
         "1. factual_summary 必须是实打实的剧情浓缩，基于已完成的实际推进和收束，不能只复述最初设定。\n"
-        "2. factual_summary 要覆盖主角、核心冲突、关键升级和最终落点，长度控制在 450 到 550 个中文字符。\n"
+        "2. factual_summary 要覆盖主角、核心冲突、关键升级和最终落点，长度控制在 450 到 550 个目标语言字符左右。\n"
         "3. marketing_blurb 用于小说网站首屏，200 字以内，可以更抓人，但不能编造正文不存在的设定或结局。\n"
         "4. 两段简介都必须和已完成主线一致，不能写成预告片口吻。\n"
+        f"{_language_guidance(spec.output_language, stage='prose')}\n"
         "5. 只返回 JSON。\n\n"
         f"作品信息：\n{compact_json(project_payload)}\n\n"
         f"设定圣经摘要：\n{compact_json(bible_payload)}\n\n"
@@ -2384,6 +2444,7 @@ def final_review_user_prompt(
         "6. 如果不通过，chapter_fixes 必须给出明确的章节级修订指令。\n"
         "6.1 如果问题主要来自连续性档案、承诺账本、因果图、active_threads 等资料池污染，而正文主线已闭环，则可以 passed=true；这类问题写进 issues/required_fixes，不要开 chapter_fixes。\n"
         "6.2 chapter_fixes 只能用于真正需要改正文的章节，每一条都必须能靠修改该章正文本身解决。\n"
+        f"{_language_guidance(spec.output_language, stage='review')}\n"
         f"{_market_profile_guidance(spec.market_profile, stage='review')}\n"
         f"{_progression_guidance(spec.progression_mode, spec.progression_flavor, spec.progression_pacing, stage='review')}\n"
         "7. 只返回 JSON。\n\n"

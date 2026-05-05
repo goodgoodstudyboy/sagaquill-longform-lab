@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from .models import BookOutline, BookPackage, ChapterResult, FinalReview, ProjectSpec
+from .projectio import normalized_output_language
 from .util import ensure_directory, slugify
 
 
@@ -39,6 +40,7 @@ def build_delivery_artifacts(
         "chapter_count": len(ordered),
         "volume_count": spec.volume_count,
         "total_chars": total_chars,
+        "output_language": spec.output_language,
         "market_profile": spec.market_profile,
         "progression_mode": spec.progression_mode,
         "files": {
@@ -69,10 +71,10 @@ def _write_volume_markdown(
     paths: list[Path] = []
     for volume_index in sorted(by_volume):
         volume_chapters = sorted(by_volume[volume_index], key=lambda item: item.index)
-        title = volume_titles.get(volume_index) or f"第{volume_index}卷"
-        body = [f"# {spec.title}", "", f"## 第{volume_index}卷 {title}", ""]
+        title = volume_titles.get(volume_index) or _volume_fallback_title(spec, volume_index)
+        body = [f"# {spec.title}", "", f"## {_volume_heading(spec, volume_index, title)}", ""]
         for chapter in volume_chapters:
-            body.extend([f"### 第{chapter.index}章 {chapter.title}", "", chapter.draft.strip(), ""])
+            body.extend([f"### {_chapter_heading(spec, chapter.index, chapter.title)}", "", chapter.draft.strip(), ""])
         path = volumes_dir / f"volume-{volume_index:02d}-{slugify(title)}.md"
         path.write_text("\n".join(body).strip() + "\n", encoding="utf-8")
         paths.append(path)
@@ -87,20 +89,22 @@ def _write_table_of_contents(
     book_package: BookPackage,
 ) -> Path:
     volume_titles = {volume.index: volume.title for volume in book_outline.volumes}
+    terms = _terms(spec)
     lines = [
-        f"# {spec.title} 目录",
+        f"# {spec.title} {terms['toc']}",
         "",
-        f"- 字数：{book_package.total_chars}",
-        f"- 章节：{book_package.chapter_count}",
-        f"- 分卷：{book_package.volume_count}",
+        _kv(terms["total_chars"], book_package.total_chars, spec),
+        _kv(terms["chapters"], book_package.chapter_count, spec),
+        _kv(terms["volumes"], book_package.volume_count, spec),
         "",
     ]
     current_volume = None
     for chapter in sorted(chapters, key=lambda item: item.index):
         if current_volume != chapter.volume_index:
             current_volume = chapter.volume_index
-            lines.extend(["", f"## 第{current_volume}卷 {volume_titles.get(current_volume, '')}".rstrip(), ""])
-        lines.append(f"- 第{chapter.index}章 {chapter.title}")
+            title = volume_titles.get(current_volume, "")
+            lines.extend(["", f"## {_volume_heading(spec, current_volume, title)}".rstrip(), ""])
+        lines.append(f"- {_chapter_heading(spec, chapter.index, chapter.title)}")
     path = delivery_dir / "table-of-contents.md"
     path.write_text("\n".join(lines).strip() + "\n", encoding="utf-8")
     return path
@@ -115,36 +119,38 @@ def _write_submission_guide(
     final_review: FinalReview,
     total_chars: int,
 ) -> Path:
+    terms = _terms(spec)
     lines = [
-        f"# {spec.title} 交付说明",
+        f"# {spec.title} {terms['submission_guide']}",
         "",
-        "## 基本信息",
+        f"## {terms['basic_info']}",
         "",
-        f"- 题材：{spec.genre}",
-        f"- 受众：{spec.audience}",
-        f"- 平台模式：{spec.market_profile}",
-        f"- 升级模式：{spec.progression_mode}",
-        f"- 字数：{total_chars}",
-        f"- 章节：{len(chapters)}",
-        f"- 分卷：{spec.volume_count}",
-        f"- 终审分：{final_review.score}",
+        _kv(terms["genre"], spec.genre, spec),
+        _kv(terms["audience"], spec.audience, spec),
+        _kv(terms["output_language"], spec.output_language, spec),
+        _kv(terms["market_profile"], spec.market_profile, spec),
+        _kv(terms["progression_mode"], spec.progression_mode, spec),
+        _kv(terms["total_chars"], total_chars, spec),
+        _kv(terms["chapters"], len(chapters), spec),
+        _kv(terms["volumes"], spec.volume_count, spec),
+        _kv(terms["final_score"], final_review.score, spec),
         "",
-        "## 一句话卖点",
+        f"## {terms['marketing_hook']}",
         "",
         book_package.marketing_blurb or spec.hook or spec.premise,
         "",
-        "## 剧情简介",
+        f"## {terms['synopsis']}",
         "",
         book_package.factual_summary or book_outline.one_line_summary,
         "",
-        "## 文件清单",
+        f"## {terms['files']}",
         "",
-        "- `../novel.md`：整书 Markdown",
-        "- `../novel.txt`：整书纯文本",
-        "- `../book-summary.md`：成书简介与目录",
-        "- `table-of-contents.md`：独立目录",
-        "- `volumes/`：分卷 Markdown",
-        "- `epub/`：EPUB 文件",
+        _file_item("../novel.md", terms["novel_md"], spec),
+        _file_item("../novel.txt", terms["novel_txt"], spec),
+        _file_item("../book-summary.md", terms["book_summary"], spec),
+        _file_item("table-of-contents.md", terms["toc_file"], spec),
+        _file_item("volumes/", terms["volumes_file"], spec),
+        _file_item("epub/", terms["epub_file"], spec),
     ]
     path = delivery_dir / "submission-guide.md"
     path.write_text("\n".join(lines).strip() + "\n", encoding="utf-8")
@@ -194,7 +200,7 @@ def _epub_content_opf(spec: ProjectSpec, book_package: BookPackage, chapter_file
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
     <dc:identifier id="book-id">{html.escape(slugify(spec.title))}</dc:identifier>
     <dc:title>{html.escape(spec.title)}</dc:title>
-    <dc:language>zh-CN</dc:language>
+    <dc:language>{html.escape(_epub_language(spec))}</dc:language>
     <dc:creator>{html.escape(spec.protagonist or "SagaQuill")}</dc:creator>
     <dc:description>{description}</dc:description>
     <meta property="dcterms:modified">{time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}</meta>
@@ -216,11 +222,13 @@ def _epub_nav_xhtml(
     chapter_files: list[str],
 ) -> str:
     volume_titles = {volume.index: volume.title for volume in book_outline.volumes}
+    lang = html.escape(_html_language(spec))
+    terms = _terms(spec)
     lines = [
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
         "<!DOCTYPE html>",
-        '<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="zh-CN">',
-        "<head><title>目录</title></head>",
+        f'<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="{lang}">',
+        f"<head><title>{html.escape(terms['toc'])}</title></head>",
         "<body>",
         '<nav epub:type="toc" id="toc">',
         f"<h1>{html.escape(spec.title)}</h1>",
@@ -230,8 +238,8 @@ def _epub_nav_xhtml(
     for chapter, filename in zip(chapters, chapter_files):
         if current_volume != chapter.volume_index:
             current_volume = chapter.volume_index
-            lines.append(f"<li>{html.escape('第' + str(current_volume) + '卷 ' + volume_titles.get(current_volume, '').strip())}</li>")
-        lines.append(f'<li><a href="{filename}">第{chapter.index}章 {html.escape(chapter.title)}</a></li>')
+            lines.append(f"<li>{html.escape(_volume_heading(spec, current_volume, volume_titles.get(current_volume, '').strip()))}</li>")
+        lines.append(f'<li><a href="{filename}">{html.escape(_chapter_heading(spec, chapter.index, chapter.title))}</a></li>')
     lines.extend(["</ol>", "</nav>", "</body>", "</html>"])
     return "\n".join(lines)
 
@@ -239,13 +247,15 @@ def _epub_nav_xhtml(
 def _chapter_xhtml(spec: ProjectSpec, chapter: ChapterResult) -> str:
     paragraphs = [_markdown_line_to_html(line) for line in chapter.draft.splitlines() if line.strip()]
     body = "\n".join(f"<p>{paragraph}</p>" for paragraph in paragraphs)
+    lang = html.escape(_html_language(spec))
+    heading = html.escape(_chapter_heading(spec, chapter.index, chapter.title))
     return f"""<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" lang="zh-CN">
-<head><title>第{chapter.index}章 {html.escape(chapter.title)}</title></head>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="{lang}">
+<head><title>{heading}</title></head>
 <body>
 <h1>{html.escape(spec.title)}</h1>
-<h2>第{chapter.index}章 {html.escape(chapter.title)}</h2>
+<h2>{heading}</h2>
 {body}
 </body>
 </html>
@@ -262,3 +272,105 @@ def _relative_to(path: Path, root: Path) -> str:
         return path.relative_to(root).as_posix()
     except ValueError:
         return path.as_posix()
+
+
+def _is_zh(spec: ProjectSpec) -> bool:
+    value = normalized_output_language(spec.output_language)
+    return value in {"zh", "zh-Hans", "zh-CN", "zh-Hant", "zh-TW"} or value.startswith("zh-")
+
+
+def _epub_language(spec: ProjectSpec) -> str:
+    value = normalized_output_language(spec.output_language)
+    mapping = {
+        "zh-Hans": "zh-CN",
+        "zh-CN": "zh-CN",
+        "zh-Hant": "zh-TW",
+        "zh-TW": "zh-TW",
+        "en": "en",
+        "ja": "ja",
+        "ko": "ko",
+        "es": "es",
+        "fr": "fr",
+        "de": "de",
+    }
+    return mapping.get(value, value or "zh-CN")
+
+
+def _html_language(spec: ProjectSpec) -> str:
+    return _epub_language(spec)
+
+
+def _chapter_heading(spec: ProjectSpec, index: object, title: object) -> str:
+    title_text = str(title or "").strip()
+    if _is_zh(spec):
+        return f"第{index}章 {title_text}".strip()
+    return f"Chapter {index}: {title_text}".strip()
+
+
+def _volume_fallback_title(spec: ProjectSpec, index: object) -> str:
+    return f"第{index}卷" if _is_zh(spec) else f"Volume {index}"
+
+
+def _volume_heading(spec: ProjectSpec, index: object, title: object) -> str:
+    title_text = str(title or "").strip()
+    if _is_zh(spec):
+        return f"第{index}卷 {title_text}".strip()
+    return f"Volume {index}: {title_text}".strip()
+
+
+def _kv(label: str, value: object, spec: ProjectSpec) -> str:
+    return f"- {label}：{value}" if _is_zh(spec) else f"- {label}: {value}"
+
+
+def _file_item(path: str, description: str, spec: ProjectSpec) -> str:
+    return f"- `{path}`：{description}" if _is_zh(spec) else f"- `{path}`: {description}"
+
+
+def _terms(spec: ProjectSpec) -> dict[str, str]:
+    if _is_zh(spec):
+        return {
+            "toc": "目录",
+            "total_chars": "字数",
+            "chapters": "章节",
+            "volumes": "分卷",
+            "submission_guide": "交付说明",
+            "basic_info": "基本信息",
+            "genre": "题材",
+            "audience": "受众",
+            "output_language": "输出语言",
+            "market_profile": "平台模式",
+            "progression_mode": "升级模式",
+            "final_score": "终审分",
+            "marketing_hook": "一句话卖点",
+            "synopsis": "剧情简介",
+            "files": "文件清单",
+            "novel_md": "整书 Markdown",
+            "novel_txt": "整书纯文本",
+            "book_summary": "成书简介与目录",
+            "toc_file": "独立目录",
+            "volumes_file": "分卷 Markdown",
+            "epub_file": "EPUB 文件",
+        }
+    return {
+        "toc": "Table Of Contents",
+        "total_chars": "Total characters",
+        "chapters": "Chapters",
+        "volumes": "Volumes",
+        "submission_guide": "Submission Guide",
+        "basic_info": "Basic Info",
+        "genre": "Genre",
+        "audience": "Audience",
+        "output_language": "Output language",
+        "market_profile": "Market profile",
+        "progression_mode": "Progression mode",
+        "final_score": "Final review score",
+        "marketing_hook": "One-Line Hook",
+        "synopsis": "Synopsis",
+        "files": "Files",
+        "novel_md": "Full novel in Markdown",
+        "novel_txt": "Full novel in plain text",
+        "book_summary": "Book summary and table of contents",
+        "toc_file": "Standalone table of contents",
+        "volumes_file": "Volume Markdown files",
+        "epub_file": "EPUB files",
+    }
