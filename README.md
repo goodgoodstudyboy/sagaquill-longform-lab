@@ -152,70 +152,30 @@ sudo systemctl restart sagaquill
 
 ### Docker 部署
 
-公开镜像发布后，可以不 clone 项目，直接运行：
+公开镜像发布后，几行启动：
 
 ```bash
-docker run -d \
-  --name sagaquill \
-  --restart unless-stopped \
-  -p 8765:8765 \
-  -e SAGAQUILL_ACCESS_TOKEN=change-me-long-random-token \
-  -v sagaquill-runs:/app/runs \
-  -v sagaquill-state:/app/.sagaquill \
-  ghcr.io/goodgoodstudyboy/sagaquill-longform-lab:latest
+TOKEN=$(openssl rand -hex 24)
+docker run -d --name sagaquill --restart unless-stopped -p 8765:8765 -e SAGAQUILL_ACCESS_TOKEN="$TOKEN" -v sagaquill-runs:/app/runs -v sagaquill-state:/app/.sagaquill ghcr.io/goodgoodstudyboy/sagaquill-longform-lab:latest
+echo "http://localhost:8765  token=$TOKEN"
 ```
 
-如果要复用宿主机上的 Codex provider 配置，再挂载 `~/.codex`：
+打开 `http://localhost:8765`，访问时使用你设置的 `SAGAQUILL_ACCESS_TOKEN`。
 
-```bash
-docker run -d \
-  --name sagaquill \
-  --restart unless-stopped \
-  -p 8765:8765 \
-  -e SAGAQUILL_ACCESS_TOKEN=change-me-long-random-token \
-  -v sagaquill-runs:/app/runs \
-  -v sagaquill-state:/app/.sagaquill \
-  -v "$HOME/.codex:/root/.codex:ro" \
-  ghcr.io/goodgoodstudyboy/sagaquill-longform-lab:latest
-```
+可选配置：
 
-也可以直接通过环境变量传 provider：
+- 复用宿主机 Codex 配置：额外挂载 `-v "$HOME/.codex:/root/.codex:ro"`
+- 直接传 provider：额外添加 `-e SAGAQUILL_BASE_URL=... -e SAGAQUILL_MODEL=... -e OPENAI_API_KEY=...`
+- 私有镜像阶段：先执行 `echo <github-token> | docker login ghcr.io -u <github-username> --password-stdin`
+- 查看日志：`docker logs -f sagaquill`
+- 停止服务：`docker rm -f sagaquill`
 
-```bash
-docker run -d \
-  --name sagaquill \
-  --restart unless-stopped \
-  -p 8765:8765 \
-  -e SAGAQUILL_ACCESS_TOKEN=change-me-long-random-token \
-  -e SAGAQUILL_BASE_URL=https://your-provider.example \
-  -e SAGAQUILL_MODEL=your-model \
-  -e OPENAI_API_KEY=your-api-key \
-  -v sagaquill-runs:/app/runs \
-  -v sagaquill-state:/app/.sagaquill \
-  ghcr.io/goodgoodstudyboy/sagaquill-longform-lab:latest
-```
-
-如果仓库或镜像仍是 private，需要先登录 GitHub Container Registry：
-
-```bash
-echo <github-token> | docker login ghcr.io -u <github-username> --password-stdin
-```
-
-如果你已经 clone 了项目，也可以用 compose：
+如果你已经 clone 了项目，可以用 compose：
 
 ```bash
 cp .env.example .env
-# 编辑 .env，至少修改 SAGAQUILL_ACCESS_TOKEN
 docker compose up -d
 ```
-
-容器会挂载：
-
-- `./runs:/app/runs`
-- `./.sagaquill:/app/.sagaquill`
-- `${HOME}/.codex:/root/.codex:ro`
-
-如果你不用 Codex 配置，也可以在 `.env` 里直接配置 `SAGAQUILL_BASE_URL`、`SAGAQUILL_MODEL`、`OPENAI_API_KEY`、`ANTHROPIC_AUTH_TOKEN` 等环境变量，再在面板里保存 provider 覆盖。
 
 面板里的 `Provider 配置` 支持：
 
